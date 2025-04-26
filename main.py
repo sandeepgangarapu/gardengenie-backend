@@ -3,11 +3,12 @@ import requests
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 import psycopg2 # Use psycopg2 for PostgreSQL
-from psycopg2.extras import RealDictCursor # Optional: To get results as dictionaries
+# from psycopg2.extras import RealDictCursor # Not strictly needed now
 from dotenv import load_dotenv
 import datetime
 import logging
 import time
+import json # Added for JSON parsing
 
 # --- Configuration & Initialization ---
 
@@ -17,9 +18,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Plant Name Cleaner API",
-    description="Cleans plant names using Gemini via OpenRouter and stores results in PostgreSQL.",
-    version="1.0.0",
+    title="Plant Care API",
+    description="Provides detailed plant care instructions (seed starting, planting, seasonal care) tailored to a USDA zone, using Gemini via OpenRouter and storing results in PostgreSQL.",
+    version="1.1.0", # Bump version
 )
 
 # --- Database Connection ---
@@ -57,24 +58,24 @@ def get_db_connection():
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Verify this model name on OpenRouter documentation
-LLM_MODEL = "google/gemini-flash-1.5"
+LLM_MODEL = "google/gemini-flash-1.5" # Or consider a more powerful model for complex JSON generation if needed
 
 if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY not found in environment variables.")
 
 # --- Pydantic Models ---
-class PlantNameInput(BaseModel):
-    raw_name: str = Field(..., min_length=1, description="The user-provided plant name.")
+class PlantCareInput(BaseModel):
+    plant_name: str = Field(..., min_length=1, description="The user-provided plant name (e.g., tomato, Fiddle Leaf Fig).")
+    user_zone: str = Field(..., pattern=r"^\d{1,2}[ab]?$", description="The user's USDA Hardiness Zone (e.g., 7a, 8b, 5).")
 
-class PlantNameOutput(BaseModel):
-    original_name: str
-    cleaned_name: str
-    model_used: str
+# Output model is now implicitly a dictionary via the endpoint's response_model=dict
+# We could define a detailed Pydantic model matching the JSON schema,
+# but returning dict is simpler and more flexible if LLM output varies slightly.
 
 # --- Helper Functions ---
 
-def call_openrouter_llm(plant_name: str) -> str | None:
-    """Calls the OpenRouter API to clean the plant name."""
+def call_openrouter_llm(plant_name: str, user_zone: str) -> dict | None:
+    """Calls the OpenRouter API to get plant care instructions as JSON."""
     if not OPENROUTER_API_KEY:
         logger.error("OpenRouter API Key is missing.")
         return None
@@ -82,72 +83,213 @@ def call_openrouter_llm(plant_name: str) -> str | None:
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost", # Example referrer, replace if needed
+        "X-Title": "Plant Care API", # Example title, replace if needed
     }
-    # Simple prompt - refine for better results
+
+    # Updated prompt requesting JSON output
     prompt = f"""
-    Given the following user input, which is potentially a messy or common name for a plant, provide the most likely standardized botanical name (Genus species) or a widely accepted, clean common name if the botanical name is ambiguous or not applicable. If the input is clearly not a plant name, respond with 'N/A'.
+Please provide detailed seed starting, planting, and care instructions for the following plant, tailored to the user's zone. **Generate the output strictly as a JSON object following the schema specified below.**
 
-    Input: "{plant_name}"
+**Input Information:**
 
-    Cleaned Name:
-    """
+*   **Plant Name:** {plant_name}
+*   **User USDA Hardiness Zone:** {user_zone}
+
+**Required Output Format (JSON Schema):**
+
+```json
+{{
+  "plantName": "[Corrected Common Name]",
+  "description": "[Brief, general description of the plant]",
+  "type": "[Annual OR Perennial]",
+  "zone": "[User USDA Hardiness Zone]",
+  "sun": "[Full Sun OR Partial Shade OR Full Shade]",
+  "seedStartingMonth": "[e.g., February OR March]", // Single best month to start seeds (often indoors) for this zone
+  "seedStartingInstructions": [
+    "[Seed starting step 1 description - e.g., Container/soil choice]",
+    "[Seed starting step 2 description - e.g., Sowing depth/spacing]",
+    "[Seed starting step 3 description - e.g., Watering/moisture]",
+    "[Seed starting step 4 description - e.g., Light/temperature needs]",
+    "[Seed starting step 5 description - e.g., Hardening off]"
+    // ... add more steps as relevant. If not typically grown from seed, this can be an empty array [].
+  ],
+  "plantingMonth": "[e.g., April OR May]", // Single best month to plant seedlings/nursery stock outdoors for this zone
+  "plantingInstructions": [
+    "[Planting step 1 description - e.g., Site selection/preparation]",
+    "[Planting step 2 description - e.g., Digging the hole]",
+    "[Planting step 3 description - e.g., Handling the seedling/root ball]",
+    "[Planting step 4 description - e.g., Placing the plant & backfilling]",
+    "[Planting step 5 description - e.g., Initial watering/mulching]"
+    // ... add more steps as relevant. Focus on planting seedlings or nursery stock outdoors.
+  ],
+  "care": {{
+    "spring": [
+      {{
+        "step": "[Care step 1 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., April OR May]" // Indicate SINGLE best month for this zone
+      }},
+      {{
+        "step": "[Care step 2 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., April OR May]" // Indicate SINGLE best month for this zone
+      }}
+      // ... more steps as relevant
+    ],
+    "summer": [
+      {{
+        "step": "[Care step 1 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., June OR July]" // Indicate SINGLE best month for this zone
+      }},
+      {{
+        "step": "[Care step 2 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., July OR August]" // Indicate SINGLE best month for this zone
+      }}
+      // ... more steps as relevant
+    ],
+    "fall": [
+      {{
+        "step": "[Care step 1 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., September OR October]" // Indicate SINGLE best month for this zone
+      }},
+      {{
+        "step": "[Care step 2 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., October OR November]" // Indicate SINGLE best month for this zone
+      }}
+      // ... more steps as relevant
+    ],
+    "winter": [
+      {{
+        "step": "[Care step 1 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., December OR January]" // Indicate SINGLE best month for this zone
+      }},
+      {{
+        "step": "[Care step 2 description]",
+        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "months": "[e.g., February OR January]" // Indicate SINGLE best month for this zone
+      }}
+      // ... more steps as relevant, if applicable
+      // If no winter care needed, this can be an empty array: []
+    ]
+  }}
+}}
+```
+Important Instructions for Generation:
+
+Output MUST be a valid JSON object. Ensure correct syntax (quotes around keys and string values, commas between elements, correct brackets [] for arrays and braces {{}} for objects).
+Correct Name: Provide the standard common name. If the input name is a misspelling or variation, use the corrected version for the "plantName" value.
+No Botanical Name: Do not include the botanical name.
+Seed Starting:
+Determine the single best month to start seeds (usually indoors) based on the plant type and User USDA Hardiness Zone, and place it in the "seedStartingMonth" field.
+Provide step-by-step instructions for starting the plant from seed in the "seedStartingInstructions" array. If the plant is not typically or easily grown from seed (e.g., many woody shrubs), provide an empty array [].
+Planting:
+Determine the single best month to plant seedlings or nursery stock outdoors, considering the last frost date for the User USDA Hardiness Zone, and place it in the "plantingMonth" field.
+Provide step-by-step instructions for planting seedlings or nursery stock outdoors in the "plantingInstructions" array.
+Ongoing Care Focus: The steps within the "care" section (spring, summer, fall, winter) should focus on ongoing maintenance after the plant is established in the ground. Do not repeat planting or seed starting steps here.
+Priority Annotation: For each care step object within the seasonal arrays, use the "priority" key with exactly one of the following string values: "must do", "good to do", or "skip if you don't have time". Assign a general priority level appropriate for the task's importance to the plant's health or primary goal (e.g., fruiting).
+Care Month Annotation: For each care step object within the seasonal arrays, use the "months" key to specify the single most appropriate month (e.g., "April", "July", "October") to perform the task, considering the User USDA Hardiness Zone. If a task is relevant over multiple months, choose the peak or most critical month for it. Do not use month ranges.
+Clarity: Provide clear and concise descriptions for all instruction steps, suitable for a general audience.
+Completeness: Fill in all specified fields in the JSON structure. If a season has no specific care steps, provide an empty array [] for that season's key. Include the user's zone in the "zone" field.
+Please generate only the JSON object based on these requirements. Do not include any introductory text or explanations outside the JSON structure itself.
+"""
     payload = {
         "model": LLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 50,
-        "temperature": 0.2,
+        "max_tokens": 1500, # Increased max_tokens for longer JSON output
+        "temperature": 0.2, # Kept temperature low for consistency
+        "response_format": {"type": "json_object"} # Request JSON output
     }
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=30)
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60) # Increased timeout
         response.raise_for_status()
         result = response.json()
-        cleaned_name = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        llm_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
 
-        if not cleaned_name or len(cleaned_name) > 100:
-             logger.warning(f"Received unusual response from LLM: {cleaned_name}")
-             return "Error: Invalid response from LLM"
-        if "N/A" in cleaned_name:
-             return "N/A"
+        if not llm_content:
+             logger.warning("Received empty content from LLM.")
+             return None # Treat empty response as an error
 
-        logger.info(f"LLM ({LLM_MODEL}) returned: '{cleaned_name}' for input '{plant_name}'")
-        return cleaned_name
+        # Attempt to parse the JSON content
+        try:
+            care_info = json.loads(llm_content)
+            logger.info(f"LLM ({LLM_MODEL}) returned valid JSON for '{plant_name}' in zone '{user_zone}'")
+            return care_info
+        except json.JSONDecodeError as json_e:
+            logger.error(f"Failed to decode JSON response from LLM: {json_e}")
+            logger.error(f"LLM Raw Content: {llm_content}")
+            return None # Return None if JSON parsing fails
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Error calling OpenRouter API: {e}")
+        # Log response text if available for debugging
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"OpenRouter Response Status: {e.response.status_code}")
+            logger.error(f"OpenRouter Response Text: {e.response.text}")
         return None
     except (KeyError, IndexError) as e:
-         logger.error(f"Error parsing OpenRouter response: {e} - Response: {response.text}")
+         logger.error(f"Error parsing OpenRouter response structure: {e} - Response: {response.text}")
+         return None
+    except Exception as e:
+         logger.error(f"An unexpected error occurred during LLM call: {e}")
          return None
 
-def store_result(original_name: str, cleaned_name: str, model_used: str):
-    """Stores the input and output in PostgreSQL."""
+
+def store_result(plant_name: str, user_zone: str, care_info: dict, model_used: str):
+    """Stores the input and the generated care instructions JSON in PostgreSQL."""
     conn = None
     cursor = None
+    # Ensure care_info is a valid dict before proceeding
+    if not isinstance(care_info, dict):
+        logger.error("Invalid care_info type passed to store_result. Expected dict.")
+        return False
+
     try:
         conn = get_db_connection()
         if conn is None:
-            # Logged in get_db_connection, just return False
-            return False
+            return False # Logged in get_db_connection
 
         cursor = conn.cursor()
-        # The table 'plant_name_logs' needs to be created in the database later
+        # Assumes a table 'plant_care_logs' with columns:
+        # plant_name TEXT, user_zone TEXT, care_instructions JSONB, model_used TEXT, timestamp TIMESTAMPTZ
+        # You MUST create this table in your PostgreSQL database.
+        # Example CREATE TABLE statement:
+        # CREATE TABLE plant_care_logs (
+        #     id SERIAL PRIMARY KEY,
+        #     plant_name TEXT NOT NULL,
+        #     user_zone TEXT NOT NULL,
+        #     care_instructions JSONB,
+        #     model_used TEXT,
+        #     timestamp TIMESTAMPTZ DEFAULT timezone('utc', now())
+        # );
         insert_query = """
-        INSERT INTO plant_name_logs (original_name, cleaned_name, model_used, timestamp)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO plant_care_logs (plant_name, user_zone, care_instructions, model_used, timestamp)
+        VALUES (%s, %s, %s, %s, %s)
         """
-        # Use UTC time for consistency
         timestamp = datetime.datetime.now(datetime.timezone.utc)
-        # Use parameterized query to prevent SQL injection
-        cursor.execute(insert_query, (original_name, cleaned_name, model_used, timestamp))
-        conn.commit() # Commit the transaction
-        logger.info(f"Stored result in PostgreSQL for '{original_name}'")
+        # Convert dict to JSON string for storage, psycopg2 handles JSONB correctly
+        care_info_json = json.dumps(care_info)
+
+        cursor.execute(insert_query, (plant_name, user_zone, care_info_json, model_used, timestamp))
+        conn.commit()
+        logger.info(f"Stored care instructions in PostgreSQL for '{plant_name}' in zone '{user_zone}'")
         return True
-    except Exception as e:
-        logger.error(f"Error storing data in PostgreSQL: {e}")
+    except psycopg2.Error as db_err: # Catch specific psycopg2 errors
+        logger.error(f"Database error storing data: {db_err}")
         if conn:
-            conn.rollback() # Rollback on error
+            conn.rollback()
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error storing data in PostgreSQL: {e}")
+        if conn:
+            conn.rollback()
         return False
     finally:
-        # Ensure cursor and connection are closed even if errors occur
         if cursor:
             cursor.close()
         if conn:
@@ -156,54 +298,60 @@ def store_result(original_name: str, cleaned_name: str, model_used: str):
 
 # --- API Endpoint ---
 
-@app.post("/clean-plant-name", response_model=PlantNameOutput)
-async def clean_plant_name(payload: PlantNameInput, request: Request):
+# Renamed endpoint and updated response model
+@app.post("/plant-care-instructions", response_model=dict)
+async def get_plant_care_instructions(payload: PlantCareInput, request: Request):
     """
-    Receives a raw plant name, cleans it using an LLM via OpenRouter,
-    stores the result in PostgreSQL, and returns the cleaned name.
+    Receives a plant name and USDA zone, generates detailed care instructions
+    using an LLM via OpenRouter, stores the result in PostgreSQL,
+    and returns the care instructions as a JSON object.
     """
-    raw_name = payload.raw_name
-    logger.info(f"Received request to clean plant name: '{raw_name}'")
+    plant_name = payload.plant_name
+    user_zone = payload.user_zone
+    logger.info(f"Received request for plant care: '{plant_name}' in zone '{user_zone}'")
 
     # 1. Call LLM
-    cleaned_name = call_openrouter_llm(raw_name)
+    care_info = call_openrouter_llm(plant_name, user_zone)
 
-    if cleaned_name is None:
-        raise HTTPException(status_code=503, detail="Error communicating with the LLM service.")
-    if "Error:" in cleaned_name:
-         raise HTTPException(status_code=500, detail=cleaned_name)
+    if care_info is None:
+        # Logged in call_openrouter_llm
+        raise HTTPException(status_code=503, detail="Error communicating with the LLM service or parsing its response.")
 
-    # 2. Store result
+    # 2. Store result (care_info is now a dictionary)
     storage_success = store_result(
-        original_name=raw_name,
-        cleaned_name=cleaned_name,
+        plant_name=plant_name,
+        user_zone=user_zone,
+        care_info=care_info, # Pass the dict
         model_used=LLM_MODEL
     )
     if not storage_success:
         # Log the error, but still return the result to the user
-        logger.warning("Failed to store result in PostgreSQL, but returning cleaned name.")
+        logger.warning("Failed to store result in PostgreSQL, but returning care instructions.")
 
-    # 3. Return result
-    return PlantNameOutput(
-        original_name=raw_name,
-        cleaned_name=cleaned_name,
-        model_used=LLM_MODEL
-    )
+    # 3. Return result (the dictionary itself)
+    return care_info
 
 @app.get("/health", status_code=200)
 async def health_check():
     """Simple health check endpoint."""
-    # You could add a quick DB ping here if desired
+    # Optional: Add DB ping
+    # conn = None
+    # try:
+    #     conn = get_db_connection()
+    #     if conn:
+    #         return {"status": "ok", "db_connection": "successful"}
+    #     else:
+    #         return {"status": "ok", "db_connection": "failed"}
+    # finally:
+    #     if conn:
+    #         conn.close()
     return {"status": "ok"}
 
 # --- Local Development Runner ---
-# This part runs when you execute `python main.py` locally.
-# It requires a local PostgreSQL instance and DATABASE_URL in .env.
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting Uvicorn server for local development...")
     # Render provides the PORT env var; default to 8000 locally if not set
     port = int(os.getenv("PORT", 8000))
-    # Host 0.0.0.0 makes it accessible on your local network
     uvicorn.run(app, host="0.0.0.0", port=port)
 
