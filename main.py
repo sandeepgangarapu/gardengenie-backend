@@ -9,6 +9,7 @@ import datetime
 import logging
 import time
 import json # Added for JSON parsing
+from fastapi.middleware.cors import CORSMiddleware # Added for CORS
 
 # --- Configuration & Initialization ---
 
@@ -21,6 +22,23 @@ app = FastAPI(
     title="Plant Care API",
     description="Provides detailed plant care instructions (seed starting, planting, seasonal care) tailored to a USDA zone, using Gemini via OpenRouter and storing results in PostgreSQL.",
     version="1.1.0", # Bump version
+)
+
+# --- CORS Middleware ---
+# Define the origins allowed to access your API
+origins = [
+    "https://gardengenie.lovable.app", # Your frontend origin
+    "http://localhost", # Allow local development if needed
+    "http://localhost:8000", # Allow local development if needed (common port)
+    # Add any other origins you need to allow
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins, # List of allowed origins
+    allow_credentials=True, # Allows cookies to be included in requests
+    allow_methods=["*"], # Allows all methods (GET, POST, PUT, DELETE, OPTIONS, etc.)
+    allow_headers=["*"], # Allows all headers
 )
 
 # --- Database Connection ---
@@ -58,7 +76,7 @@ def get_db_connection():
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Verify this model name on OpenRouter documentation
-LLM_MODEL = "google/gemini-flash-1.5" # Or consider a more powerful model for complex JSON generation if needed
+LLM_MODEL = "google/gemini-2.5-flash-preview" # Or consider a more powerful model for complex JSON generation if needed
 
 if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY not found in environment variables.")
