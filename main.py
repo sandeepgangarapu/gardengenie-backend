@@ -104,6 +104,7 @@ Please provide detailed seed starting, planting, and care instructions for the f
   "description": "[Brief, general description of the plant]",
   "type": "[Annual OR Perennial]",
   "zone": "[User USDA Hardiness Zone]",
+  "zoneSuitability": "[match OR close OR far]", // How well the plant's typical range fits the user zone
   "sun": "[Full Sun OR Partial Shade OR Full Shade]",
   "seedStartingMonth": "[e.g., February OR March]", // Single best month to start seeds (often indoors) for this zone
   "seedStartingInstructions": [
@@ -185,6 +186,10 @@ Important Instructions for Generation:
 Output MUST be a valid JSON object. Ensure correct syntax (quotes around keys and string values, commas between elements, correct brackets [] for arrays and braces {{}} for objects).
 Correct Name: Provide the standard common name. If the input name is a misspelling or variation, use the corrected version for the "plantName" value.
 No Botanical Name: Do not include the botanical name.
+Zone Suitability: Compare the plant's typical USDA hardiness range to the **User USDA Hardiness Zone**. Set the `"zoneSuitability"` field to:
+"match": If the user's zone is well within the plant's typical range.
+"close": If the user's zone is at the edge (minimum or maximum) of the plant's typical range.
+"far": If the user's zone is significantly outside the plant's typical range.
 Seed Starting:
 Determine the single best month to start seeds (usually indoors) based on the plant type and User USDA Hardiness Zone, and place it in the "seedStartingMonth" field.
 Provide step-by-step instructions for starting the plant from seed in the "seedStartingInstructions" array. If the plant is not typically or easily grown from seed (e.g., many woody shrubs), provide an empty array [].
