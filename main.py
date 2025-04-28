@@ -16,6 +16,7 @@ from typing import Optional, Any, List
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
 from postgrest import APIResponse # To check response types
+from postgrest import APIError # Added for specific exception handling
 
 # --- Configuration & Initialization ---
 
@@ -299,8 +300,18 @@ def store_result(
                                     .select('plant_id')\
                                     .eq('plant_name', plant_name)\
                                     .eq('zone', zone)\
-                                    .maybe_single()\
                                     .execute()
+
+        # --- Add detailed logging --- 
+        logger.debug(f"Supabase find query response type: {type(response)}")
+        logger.debug(f"Supabase find query response value: {response!r}") # Using !r for unambiguous representation
+        # --- End detailed logging ---
+
+        # --- Add check for None response ---
+        if response is None:
+            logger.error("Supabase query execution (find plant) returned None. Check connection/client state/API logs (maybe 406?).")
+            return False
+        # --- End added check ---
 
         plant_data_for_upsert = {
             'plant_name': plant_name,
@@ -315,11 +326,16 @@ def store_result(
             # 'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat() # Let Supabase handle timestamp updates if configured
         }
 
-        if response.data:
-            # Plant exists, Update it
-            plant_uuid = response.data.get('plant_id')
+        # --- Modify logic to handle list response --- 
+        if response.data and len(response.data) > 0:
+            # Plant(s) exist
+            if len(response.data) > 1:
+                 logger.warning(f"Found multiple ({len(response.data)}) existing plant records for name '{plant_name}' and zone '{zone}'. Updating the first one found.")
+            
+            # Get UUID from the first result
+            plant_uuid = response.data[0].get('plant_id') 
             if not plant_uuid:
-                 logger.error(f"Found plant record but missing plant_id: {response.data}")
+                 logger.error(f"Found plant record(s) but missing plant_id in the first result: {response.data[0]}")
                  return False
 
             logger.info(f"Found existing plant with UUID: {plant_uuid}. Updating.")
@@ -327,17 +343,26 @@ def store_result(
                                                 .update(plant_data_for_upsert)\
                                                 .eq('plant_id', plant_uuid)\
                                                 .execute()
+            # Check for None before checking attributes
+            if update_response is None:
+                logger.error("Supabase update execution returned None.")
+                return False
             # Check for update errors (supabase-py might raise exceptions on failure too)
-            if not hasattr(update_response, 'data'): # Basic check if response looks OK
-                 logger.error(f"Failed to update plant record. Response: {update_response}")
-                 return False
+            # Note: Supabase update often returns empty data on success, so checking length might not be reliable.
+            # Relying on absence of error/None response or specific APIError.
+            # if not hasattr(update_response, 'data'): ... # This check might be too strict
 
         else:
-            # Plant doesn't exist, Insert it
+            # Plant doesn't exist (response.data is empty list or None - handled above), Insert it
             logger.info(f"Inserting new plant: {plant_name}, zone: {zone}")
             insert_response: APIResponse = supabase.table('plants')\
                                                 .insert(plant_data_for_upsert)\
                                                 .execute()
+
+            # Check for None before accessing data
+            if insert_response is None:
+                 logger.error("Supabase plant insert execution returned None.")
+                 return False
 
             if insert_response.data and len(insert_response.data) > 0:
                 plant_uuid = insert_response.data[0].get('plant_id')
@@ -363,10 +388,15 @@ def store_result(
                                             .delete()\
                                             .eq('plant_id', plant_uuid)\
                                             .execute()
+        # Check for None before checking attributes
+        if delete_response is None:
+            logger.warning("Supabase delete execution returned None. Cannot confirm deletion.")
+            # Decide if this is fatal - potentially allows duplicates if insert succeeds
+            # return False # Optional: make it fatal
         # Deleting 0 rows is not an error here
         # Check if the response indicates a failure other than 0 rows deleted
-        if not hasattr(delete_response, 'data') and not hasattr(delete_response, 'count'): # Heuristic check
-             logger.warning(f"Could not confirm deletion of old care instructions. Response: {delete_response}")
+        elif not hasattr(delete_response, 'data') and not hasattr(delete_response, 'count'): # Heuristic check
+             logger.warning(f"Could not confirm deletion of old care instructions. Response: {delete_response!r}") # Log response detail
              # Decide if this is fatal - potentially allows duplicates if insert succeeds
              # return False # Optional: make it fatal
 
@@ -396,21 +426,35 @@ def store_result(
                                                 .insert(seasonal_instructions_to_insert)\
                                                 .execute()
 
+        # Check for None before accessing data
+        if insert_care_response is None:
+            logger.error("Supabase care instructions insert execution returned None.")
+            return False
+
         if not insert_care_response.data or len(insert_care_response.data) != len(seasonal_instructions_to_insert):
-            logger.error(f"Failed to insert all seasonal care instructions. Response: {insert_care_response}")
+            logger.error(f"Failed to insert all seasonal care instructions. Response: {insert_care_response!r}") # Log response detail
             # This indicates partial success or total failure of the batch insert
             return False
 
         logger.info(f"Successfully stored {len(seasonal_instructions_to_insert)} seasonal care instructions.")
         return True
 
+    except APIError as api_e:
+        # Catch specific Supabase/PostgREST API errors
+        logger.error(f"Supabase API Error: {api_e.message}", exc_info=True)
+        # You can optionally log more details if needed:
+        # logger.error(f"Status Code: {api_e.status_code}")
+        # logger.error(f"Details: {api_e.details}")
+        # logger.error(f"Hint: {api_e.hint}")
+        return False
     except Exception as e:
         # Catch potential exceptions from supabase-py client calls or other logic
         logger.error(f"An unexpected error occurred during Supabase storage: {e}", exc_info=True)
         # Log the specific Supabase error if available (depends on supabase-py version/error handling)
-        if hasattr(e, 'message'): logger.error(f"Supabase Error Message: {e.message}")
-        if hasattr(e, 'details'): logger.error(f"Supabase Error Details: {e.details}")
-        if hasattr(e, 'hint'): logger.error(f"Supabase Error Hint: {e.hint}")
+        # Removed redundant checks here as APIError should catch most supabase errors
+        # if hasattr(e, 'message'): logger.error(f"Supabase Error Message: {e.message}")
+        # if hasattr(e, 'details'): logger.error(f"Supabase Error Details: {e.details}")
+        # if hasattr(e, 'hint'): logger.error(f"Supabase Error Hint: {e.hint}")
         return False
 
 
