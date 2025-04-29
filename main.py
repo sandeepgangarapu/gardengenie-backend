@@ -210,12 +210,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "spring": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // Use 'optional' instead of 'skip'
         "months": "[e.g., April OR May]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., April OR May]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant, steps ordered as they appear here
@@ -223,12 +223,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "summer": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., June OR July]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., July OR August]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant
@@ -236,12 +236,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "fall": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., September OR October]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., October OR November]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant
@@ -249,12 +249,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "winter": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., December OR January]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip]", // General priority level
+        "priority": "[must do OR good to do OR optional]", // Use 'optional' instead of 'skip'
         "months": "[e.g., February OR January]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant, if applicable
@@ -272,7 +272,7 @@ Plant/Seed Months: Provide the single best month string or null if not applicabl
 Instructions: Provide seed/planting instructions as arrays of strings. Empty array `[]` if not applicable.
 Sun: Provide the sun preference string (e.g., "Full Sun").
 Care Section: Structure seasonal care exactly as shown. For each step, include `step`, `priority`, and `months`.
-Priority/Season ENUMs: If `priority` or `season` columns in Supabase are ENUMs, ensure the generated strings match valid ENUM values exactly (e.g., 'spring', 'summer', 'fall', 'winter', 'must do', 'good to do', 'skip').
+Priority/Season ENUMs: If `priority` or `season` columns in Supabase are ENUMs, ensure the generated strings match valid ENUM values exactly (e.g., 'spring', 'summer', 'fall', 'winter', 'must do', 'good to do', 'optional'). Use 'optional' if something is not critical.
 Completeness: Fill all fields. Use `null` for optional month fields if not applicable. Use empty arrays `[]` for instruction lists or seasonal care lists if empty.
 """
     payload = {
@@ -410,6 +410,7 @@ def store_result(
     seed_instructions = care_info.get('seedStartingInstructions') or []
     plant_instructions = care_info.get('plantingInstructions') or []
     care_details = care_info.get('care', {})
+    zone_suitability = care_info.get('zoneSuitability') # Extract zone suitability
 
     # Basic validation for core data needed for insertion
     if not plant_name or not zone:
@@ -450,6 +451,7 @@ def store_result(
             'planting_month': plant_month,
             'seed_starting_instructions': seed_instructions,
             'planting_instructions': plant_instructions,
+            'zone_suitability': zone_suitability, # Add zone suitability here
             # 'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat() # Let Supabase handle timestamp updates if configured
         }
 
