@@ -77,7 +77,7 @@ app.add_middleware(
 # --- OpenRouter Configuration ---
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-LLM_MODEL = "google/gemini-2.5-pro-preview-03-25"
+LLM_MODEL = "google/gemini-2.5-flash-preview"
 
 if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY not found in environment variables.")
