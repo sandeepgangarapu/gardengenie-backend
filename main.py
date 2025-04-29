@@ -147,12 +147,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "spring": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., April OR May]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., April OR May]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant, steps ordered as they appear here
@@ -160,12 +160,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "summer": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., June OR July]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., July OR August]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant
@@ -173,12 +173,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "fall": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., September OR October]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., October OR November]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant
@@ -186,12 +186,12 @@ Please provide detailed seed starting, planting, and care instructions for the f
     "winter": [
       {{
         "step": "[Care step 1 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., December OR January]" // Indicate SINGLE best month for this zone
       }},
       {{
         "step": "[Care step 2 description]",
-        "priority": "[must do OR good to do OR skip if you don't have time]", // General priority level
+        "priority": "[must do OR good to do OR skip]", // General priority level
         "months": "[e.g., February OR January]" // Indicate SINGLE best month for this zone
       }}
       // ... more steps as relevant, if applicable
