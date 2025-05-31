@@ -232,8 +232,8 @@ Please provide care instructions for this indoor houseplant. **Generate the outp
   "description": "[Brief description of the houseplant]",
   "type": "[Annual OR Perennial]",
   "indoorOutdoor": "Indoor",
-  "zone": "N/A", // Indoor plants don't depend on zones
-  "zoneSuitability": "N/A",
+  "zone": null, // Indoor plants don't depend on zones
+  "zoneSuitability": null, // Indoor plants don't have zone suitability
   "sun": "[Bright Light OR Medium Light OR Low Light]", // Indoor light requirements
   "seedStartingMonth": null, // Indoor plants are typically bought, not grown from seed
   "seedStartingInstructions": [], // Empty for indoor plants
