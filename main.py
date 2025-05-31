@@ -45,8 +45,8 @@ else:
 
 app = FastAPI(
     title="Plant Care API",
-    description="Provides detailed plant care instructions (seed starting, planting, seasonal care) tailored to a USDA zone, including indoor/outdoor growing classification, using Gemini via OpenRouter and storing results in Supabase.",
-    version="1.5.0", # Bump version for indoor/outdoor feature
+    description="Smart plant care instructions with automatic indoor/outdoor classification. Indoor plants get focused care guidance (no seed starting), while outdoor plants receive complete zone-specific instructions including seed starting and planting. Perfect for apartment dwellers and gardeners.",
+    version="1.6.0", # Bump version for two-step classification feature
 )
 
 # --- CORS Middleware ---
@@ -156,8 +156,168 @@ def get_unsplash_image(plant_name: str) -> Optional[dict]:
         return None
 
 
-def call_openrouter_llm(plant_name: str, user_zone: str) -> dict | None:
-    """Calls the OpenRouter API to get plant care instructions as JSON."""
+def classify_plant_environment(plant_name: str) -> str | None:
+    """First determines if a plant is typically grown indoors or outdoors."""
+    if not OPENROUTER_API_KEY:
+        logger.error("OpenRouter API Key is missing.")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "Plant Care API",
+    }
+
+    prompt = f"""
+Is the plant "{plant_name}" typically grown as an indoor houseplant or an outdoor garden plant?
+
+Respond with ONLY one word: "Indoor" or "Outdoor"
+
+Consider:
+- Indoor: Houseplants, plants commonly grown in pots indoors, apartment-friendly plants
+- Outdoor: Garden plants, landscape plants, plants that require outdoor conditions
+
+Plant: {plant_name}
+Response:"""
+
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 10,
+        "temperature": 0.1,
+    }
+
+    try:
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        classification = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        
+        if classification in ["Indoor", "Outdoor"]:
+            logger.info(f"Plant '{plant_name}' classified as: {classification}")
+            return classification
+        else:
+            logger.warning(f"Unexpected classification result: {classification}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error classifying plant environment: {e}")
+        return None
+
+
+def call_openrouter_llm_indoor(plant_name: str) -> dict | None:
+    """Calls the OpenRouter API to get indoor plant care instructions as JSON."""
+    if not OPENROUTER_API_KEY:
+        logger.error("OpenRouter API Key is missing.")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "Plant Care API",
+    }
+
+    prompt = f"""
+Please provide care instructions for this indoor houseplant. **Generate the output strictly as a JSON object following the schema specified below.**
+
+**Plant Name:** {plant_name}
+
+**Required Output Format (JSON Schema for Indoor Plants):**
+
+```json
+{{
+  "plantName": "[Corrected Common Name]",
+  "description": "[Brief description of the houseplant]",
+  "type": "[Annual OR Perennial]",
+  "indoorOutdoor": "Indoor",
+  "zone": "N/A", // Indoor plants don't depend on zones
+  "zoneSuitability": "N/A",
+  "sun": "[Bright Light OR Medium Light OR Low Light]", // Indoor light requirements
+  "seedStartingMonth": null, // Indoor plants are typically bought, not grown from seed
+  "seedStartingInstructions": [], // Empty for indoor plants
+  "plantingMonth": null, // Not applicable for indoor plants
+  "plantingInstructions": [], // Empty for indoor plants
+  "care": {{
+    "spring": [
+      {{
+        "step": "[Care step description - e.g., 'Increase watering frequency as plant enters growing season']",
+        "priority": "[must do OR good to do OR optional]",
+        "months": "[e.g., March OR April]" // Use specific month names for consistency
+      }}
+    ],
+    "summer": [
+      {{
+        "step": "[Care step description - e.g., 'Monitor for increased water needs in warmer weather']",
+        "priority": "[must do OR good to do OR optional]",
+        "months": "[e.g., June OR July]" // Use specific month names for consistency
+      }}
+    ],
+    "fall": [
+      {{
+        "step": "[Care step description - e.g., 'Reduce watering as growth slows']",
+        "priority": "[must do OR good to do OR optional]",
+        "months": "[e.g., September OR October]" // Use specific month names for consistency
+      }}
+    ],
+    "winter": [
+      {{
+        "step": "[Care step description - e.g., 'Move away from cold windows, reduce fertilizing']",
+        "priority": "[must do OR good to do OR optional]",
+        "months": "[e.g., December OR January]" // Use specific month names for consistency
+      }}
+    ]
+  }}
+}}
+```
+
+Important Instructions:
+- Focus on indoor houseplant care: watering, light, humidity, fertilizing, repotting, pest control
+- Use specific month names (January, February, March, etc.) for consistency with outdoor plants
+- Provide practical apartment/home care advice based on general indoor growing patterns
+- Include tips for common indoor plant issues
+- Leave seed starting and planting sections empty/null as specified
+- For timing, consider general indoor plant growth patterns (more active in spring/summer, slower in fall/winter)
+"""
+
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1000,
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}
+    }
+
+    try:
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        result = response.json()
+        llm_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+        if not llm_content:
+            logger.warning("Received empty content from LLM for indoor plant.")
+            return None
+
+        try:
+            care_info = json.loads(llm_content)
+            if not all(k in care_info for k in ['plantName', 'indoorOutdoor', 'care']):
+                logger.error(f"LLM JSON missing essential keys for indoor plant: {care_info}")
+                return None
+            logger.info(f"LLM ({LLM_MODEL}) returned valid JSON for indoor plant '{plant_name}'")
+            return care_info
+        except json.JSONDecodeError as json_e:
+            logger.error(f"Failed to decode JSON response from LLM for indoor plant: {json_e}")
+            logger.error(f"LLM Raw Content: {llm_content}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error calling OpenRouter API for indoor plant: {e}")
+        return None
+
+
+def call_openrouter_llm_outdoor(plant_name: str, user_zone: str) -> dict | None:
+    """Calls the OpenRouter API to get outdoor plant care instructions as JSON."""
     if not OPENROUTER_API_KEY:
         logger.error("OpenRouter API Key is missing.")
         return None
@@ -185,7 +345,7 @@ Please provide detailed seed starting, planting, and care instructions for the f
   "plantName": "[Corrected Common Name]",
   "description": "[Brief, general description of the plant]",
   "type": "[Annual OR Perennial]",
-  "indoorOutdoor": "[Indoor OR Outdoor OR Both]", // Whether this plant is typically grown indoors, outdoors, or can be grown in both environments
+  "indoorOutdoor": "Outdoor",
   "zone": "[User USDA Hardiness Zone]",
   "zoneSuitability": "[match OR close OR far]", // Not directly stored in plants, used for logging if needed
   "sun": "[Full Sun OR Partial Shade OR Full Shade]", // Will be mapped to 'sun_requirements'
@@ -269,7 +429,6 @@ Important Instructions for Generation:
 Output MUST be a valid JSON object.
 Match Schema: Adhere strictly to the keys and expected data types (string, array of strings, nested objects/arrays) shown above.
 Correct Name: Use the standard common name for "plantName".
-Indoor/Outdoor: Specify whether the plant is typically grown "Indoor", "Outdoor", or "Both" based on common growing practices.
 Plant/Seed Months: Provide the single best month string or null if not applicable.
 Instructions: Provide seed/planting instructions as arrays of strings. Empty array `[]` if not applicable.
 Sun: Provide the sun preference string (e.g., "Full Sun").
@@ -298,7 +457,7 @@ Completeness: Fill all fields. Use `null` for optional month fields if not appli
         try:
             care_info = json.loads(llm_content)
             # Basic validation: check for essential keys
-            if not all(k in care_info for k in ['plantName', 'zone', 'indoorOutdoor', 'care']):
+            if not all(k in care_info for k in ['plantName', 'zone', 'care']):
                 logger.error(f"LLM JSON missing essential keys: {care_info}")
                 return None
             logger.info(f"LLM ({LLM_MODEL}) returned valid JSON for '{plant_name}' in zone '{user_zone}'")
@@ -606,9 +765,10 @@ def store_result(
 @app.post("/plant-care-instructions", response_model=dict)
 async def get_plant_care_instructions(payload: PlantCareInput, request: Request):
     """
-    Receives a plant name and USDA zone, generates detailed care instructions
-    using an LLM via OpenRouter, stores the result (and fetches/stores an image)
-    in Supabase using supabase-py, and returns the care instructions as a JSON object.
+    Receives a plant name and USDA zone, first classifies if it's indoor or outdoor,
+    then generates appropriate care instructions using an LLM via OpenRouter,
+    stores the result (and fetches/stores an image) in Supabase using supabase-py,
+    and returns the care instructions as a JSON object.
     """
     if supabase is None:
          raise HTTPException(status_code=503, detail="Database client is not initialized. Cannot process request.")
@@ -617,14 +777,26 @@ async def get_plant_care_instructions(payload: PlantCareInput, request: Request)
     user_zone = payload.user_zone
     logger.info(f"Received request for plant care: '{plant_name}' in zone '{user_zone}'")
 
-    # 1. Call LLM
-    care_info = call_openrouter_llm(plant_name, user_zone)
+    # Step 1: Classify if plant is indoor or outdoor
+    plant_environment = classify_plant_environment(plant_name)
+    
+    if plant_environment is None:
+        logger.error(f"Could not classify plant environment for '{plant_name}'")
+        raise HTTPException(status_code=503, detail="Error determining if plant is indoor or outdoor.")
+
+    # Step 2: Call appropriate LLM function based on classification
+    if plant_environment == "Indoor":
+        logger.info(f"Processing '{plant_name}' as indoor plant")
+        care_info = call_openrouter_llm_indoor(plant_name)
+    else:  # Outdoor
+        logger.info(f"Processing '{plant_name}' as outdoor plant for zone '{user_zone}'")
+        care_info = call_openrouter_llm_outdoor(plant_name, user_zone)
 
     if care_info is None:
-        # Logged in call_openrouter_llm
+        # Logged in respective LLM functions
         raise HTTPException(status_code=503, detail="Error communicating with the LLM service or parsing its response.")
 
-    # 2. Store result in Supabase using supabase-py
+    # 3. Store result in Supabase using supabase-py
     # Note: store_result now also handles image fetching/storage internally
     storage_success = store_result(
         original_plant_name=plant_name, # Pass the original name if needed for comparison/logging
@@ -640,7 +812,7 @@ async def get_plant_care_instructions(payload: PlantCareInput, request: Request)
     # If storage_success is True, it means plant/care info was stored.
     # Image storage failures are logged as warnings inside store_result but don't cause storage_success to be False.
 
-    # 3. Return result (the dictionary itself)
+    # 4. Return result (the dictionary itself)
     return care_info
 
 @app.get("/health", status_code=200)
