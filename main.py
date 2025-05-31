@@ -45,8 +45,8 @@ else:
 
 app = FastAPI(
     title="Plant Care API",
-    description="Provides detailed plant care instructions (seed starting, planting, seasonal care) tailored to a USDA zone, using Gemini via OpenRouter and storing results in Supabase.",
-    version="1.4.0", # Bump version for Unsplash integration
+    description="Provides detailed plant care instructions (seed starting, planting, seasonal care) tailored to a USDA zone, including indoor/outdoor growing classification, using Gemini via OpenRouter and storing results in Supabase.",
+    version="1.5.0", # Bump version for indoor/outdoor feature
 )
 
 # --- CORS Middleware ---
@@ -185,6 +185,7 @@ Please provide detailed seed starting, planting, and care instructions for the f
   "plantName": "[Corrected Common Name]",
   "description": "[Brief, general description of the plant]",
   "type": "[Annual OR Perennial]",
+  "indoorOutdoor": "[Indoor OR Outdoor OR Both]", // Whether this plant is typically grown indoors, outdoors, or can be grown in both environments
   "zone": "[User USDA Hardiness Zone]",
   "zoneSuitability": "[match OR close OR far]", // Not directly stored in plants, used for logging if needed
   "sun": "[Full Sun OR Partial Shade OR Full Shade]", // Will be mapped to 'sun_requirements'
@@ -268,6 +269,7 @@ Important Instructions for Generation:
 Output MUST be a valid JSON object.
 Match Schema: Adhere strictly to the keys and expected data types (string, array of strings, nested objects/arrays) shown above.
 Correct Name: Use the standard common name for "plantName".
+Indoor/Outdoor: Specify whether the plant is typically grown "Indoor", "Outdoor", or "Both" based on common growing practices.
 Plant/Seed Months: Provide the single best month string or null if not applicable.
 Instructions: Provide seed/planting instructions as arrays of strings. Empty array `[]` if not applicable.
 Sun: Provide the sun preference string (e.g., "Full Sun").
@@ -296,7 +298,7 @@ Completeness: Fill all fields. Use `null` for optional month fields if not appli
         try:
             care_info = json.loads(llm_content)
             # Basic validation: check for essential keys
-            if not all(k in care_info for k in ['plantName', 'zone', 'care']):
+            if not all(k in care_info for k in ['plantName', 'zone', 'indoorOutdoor', 'care']):
                 logger.error(f"LLM JSON missing essential keys: {care_info}")
                 return None
             logger.info(f"LLM ({LLM_MODEL}) returned valid JSON for '{plant_name}' in zone '{user_zone}'")
@@ -403,6 +405,7 @@ def store_result(
     zone = care_info.get('zone')
     description = care_info.get('description')
     plant_type = care_info.get('type')
+    indoor_outdoor = care_info.get('indoorOutdoor') # Extract indoor/outdoor classification
     sun_requirements = care_info.get('sun') # Map LLM 'sun'
     seed_start_month = care_info.get('seedStartingMonth')
     plant_month = care_info.get('plantingMonth')
@@ -446,6 +449,7 @@ def store_result(
             'zone': zone,
             'description': description,
             'type': plant_type,
+            'indoor_outdoor': indoor_outdoor,
             'sun_requirements': sun_requirements,
             'seed_starting_month': seed_start_month,
             'planting_month': plant_month,
