@@ -575,7 +575,8 @@ def store_result(
     zone_suitability = care_info.get('zoneSuitability') # Extract zone suitability
 
     # Basic validation for core data needed for insertion
-    if not plant_name or not zone:
+    # For indoor plants, zone can be null; for outdoor plants, zone is required
+    if not plant_name or (not zone and indoor_outdoor != 'Indoor'):
         logger.error(f"Missing essential plantName or zone in care_info: {care_info}")
         return False
 
@@ -585,12 +586,24 @@ def store_result(
     try:
         # --- SECTION A: Store Plant and Care Instructions ---
         # 2. Find or Insert/Update Plant Record
-        logger.debug(f"Checking for plant: {plant_name}, zone: {zone}")
-        response: APIResponse = supabase.table('plants')\
-                                    .select('plant_id')\
-                                    .eq('plant_name', plant_name)\
-                                    .eq('zone', zone)\
-                                    .execute()
+        logger.debug(f"Checking for plant: {plant_name}, zone: {zone}, indoor_outdoor: {indoor_outdoor}")
+        
+        # Use different query logic for indoor vs outdoor plants
+        if indoor_outdoor == 'Indoor':
+            # For indoor plants, search by name and indoor_outdoor type
+            response: APIResponse = supabase.table('plants')\
+                                        .select('plant_id')\
+                                        .eq('plant_name', plant_name)\
+                                        .eq('indoor_outdoor', 'Indoor')\
+                                        .is_('zone', 'null')\
+                                        .execute()
+        else:
+            # For outdoor plants, search by name and zone
+            response: APIResponse = supabase.table('plants')\
+                                        .select('plant_id')\
+                                        .eq('plant_name', plant_name)\
+                                        .eq('zone', zone)\
+                                        .execute()
 
         # --- Add detailed logging ---
         logger.debug(f"Supabase find query response type: {type(response)}")
