@@ -388,7 +388,7 @@ Important Instructions:
     payload = {
         "model": LLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1000,
+        "max_tokens": 1500,  # Increased to match outdoor function and accommodate full JSON
         "temperature": 0.2,
         "response_format": {"type": "json_object"}
     }
@@ -401,6 +401,12 @@ Important Instructions:
 
         if not llm_content:
             logger.warning("Received empty content from LLM for indoor plant.")
+            return None
+
+        # Check if JSON response appears to be truncated
+        if not llm_content.rstrip().endswith('}'):
+            logger.warning(f"LLM response appears to be truncated (doesn't end with '}}'). Content length: {len(llm_content)}")
+            logger.warning(f"Truncated content: {llm_content}")
             return None
 
         try:
@@ -556,6 +562,12 @@ Completeness: Fill all fields. Use `null` for optional month fields if not appli
         if not llm_content:
              logger.warning("Received empty content from LLM.")
              return None # Treat empty response as an error
+
+        # Check if JSON response appears to be truncated
+        if not llm_content.rstrip().endswith('}'):
+            logger.warning(f"LLM response appears to be truncated (doesn't end with '}}'). Content length: {len(llm_content)}")
+            logger.warning(f"Truncated content: {llm_content}")
+            return None
 
         # Attempt to parse the JSON content
         try:
