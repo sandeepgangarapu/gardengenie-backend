@@ -1,6 +1,6 @@
 import os
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel, Field
 # import psycopg2 # Use psycopg2 for PostgreSQL # Removed psycopg2
 # from psycopg2.extras import RealDictCursor # Not strictly needed now # Removed psycopg2
@@ -9,6 +9,7 @@ import datetime
 import logging
 import time
 import json # Added for JSON parsing
+import base64 # Added for image encoding
 from fastapi.middleware.cors import CORSMiddleware # Added for CORS
 from typing import Optional, Any, List
 
@@ -45,8 +46,8 @@ else:
 
 app = FastAPI(
     title="Plant Care API",
-    description="Smart plant care instructions with automatic indoor/outdoor classification. Indoor plants get focused care guidance (no seed starting), while outdoor plants receive complete zone-specific instructions including seed starting and planting. Perfect for apartment dwellers and gardeners.",
-    version="1.6.0", # Bump version for two-step classification feature
+    description="Smart plant care instructions with automatic indoor/outdoor classification and AI-powered plant identification from images. Indoor plants get focused care guidance (no seed starting), while outdoor plants receive complete zone-specific instructions including seed starting and planting. Features include: plant identification from uploaded photos, personalized care instructions, and USDA zone-specific guidance. Perfect for apartment dwellers and gardeners.",
+    version="1.7.0", # Bump version for plant identification feature
 )
 
 # --- CORS Middleware ---
@@ -77,7 +78,7 @@ app.add_middleware(
 # --- OpenRouter Configuration ---
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-LLM_MODEL = "google/gemini-2.5-flash-preview"
+LLM_MODEL = "google/gemini-2.5-flash-preview-05-20:thinking"
 
 if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY not found in environment variables.")
@@ -94,6 +95,13 @@ if not UNSPLASH_ACCESS_KEY:
 class PlantCareInput(BaseModel):
     plant_name: str = Field(..., min_length=1, description="The user-provided plant name (e.g., tomato, Fiddle Leaf Fig).")
     user_zone: str = Field(..., pattern=r"^\d{1,2}[ab]?$", description="The user's USDA Hardiness Zone (e.g., 7a, 8b, 5).")
+
+
+class PlantIdentificationResponse(BaseModel):
+    is_plant: bool = Field(..., description="Whether the uploaded image contains a plant, tree, or shrub.")
+    common_name: Optional[str] = Field(None, description="The common name of the plant if identified, null if not a plant.")
+    confidence: Optional[str] = Field(None, description="Confidence level of the identification (high, medium, low).")
+    message: str = Field(..., description="Human-readable message about the identification result.")
 
 
 # --- Helper Functions ---
@@ -203,6 +211,102 @@ Response:"""
 
     except Exception as e:
         logger.error(f"Error classifying plant environment: {e}")
+        return None
+
+
+def identify_plant_from_image(image_data: bytes) -> dict | None:
+    """Analyzes an uploaded image to determine if it contains a plant and identify it."""
+    if not OPENROUTER_API_KEY:
+        logger.error("OpenRouter API Key is missing.")
+        return None
+
+    # Convert image bytes to base64
+    try:
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
+    except Exception as e:
+        logger.error(f"Error encoding image to base64: {e}")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "Plant Care API",
+    }
+
+    prompt = """
+Analyze this image and determine if it contains a plant, tree, shrub, or any gardening-related vegetation.
+
+Respond with a JSON object in this exact format:
+
+{
+  "is_plant": true/false,
+  "common_name": "Common name of the plant" or null,
+  "confidence": "high/medium/low" or null,
+  "message": "Descriptive message about what you see"
+}
+
+Guidelines:
+- Set "is_plant" to true only if the image clearly shows a living plant, tree, shrub, flower, or gardening vegetation
+- If it's a plant, provide the most accurate common name you can identify
+- Set confidence based on how certain you are of the identification:
+  - "high": Very confident in the identification
+  - "medium": Fairly confident but could be similar species
+  - "low": Uncertain, could be multiple possibilities
+- If not a plant, set common_name and confidence to null
+- Always provide a helpful message describing what you observe
+
+Examples of what counts as plants: houseplants, garden plants, trees, shrubs, flowers, vegetables, herbs, succulents, etc.
+Examples of what doesn't count: artificial plants, plant-printed items, drawings of plants, dead/dried plants unless clearly identifiable.
+"""
+
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64}"
+                        }
+                    }
+                ]
+            }
+        ],
+        "max_tokens": 300,
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}
+    }
+
+    try:
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        result = response.json()
+        llm_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+        if not llm_content:
+            logger.warning("Received empty content from LLM for plant identification.")
+            return None
+
+        try:
+            identification = json.loads(llm_content)
+            # Validate required fields
+            if not all(k in identification for k in ['is_plant', 'message']):
+                logger.error(f"LLM JSON missing essential keys for plant identification: {identification}")
+                return None
+            
+            logger.info(f"Plant identification completed: is_plant={identification.get('is_plant')}, name={identification.get('common_name')}")
+            return identification
+        except json.JSONDecodeError as json_e:
+            logger.error(f"Failed to decode JSON response from LLM for plant identification: {json_e}")
+            logger.error(f"LLM Raw Content: {llm_content}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error calling OpenRouter API for plant identification: {e}")
         return None
 
 
@@ -827,6 +931,66 @@ async def get_plant_care_instructions(payload: PlantCareInput, request: Request)
 
     # 4. Return result (the dictionary itself)
     return care_info
+
+@app.post("/identify-plant", response_model=PlantIdentificationResponse)
+async def identify_plant(file: UploadFile = File(...)):
+    """
+    Accepts an uploaded image and uses AI vision to determine if it contains a plant
+    and identify its common name if it is a plant.
+    """
+    logger.info(f"Received plant identification request for file: {file.filename}")
+    
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=400, 
+            detail="File must be an image (JPEG, PNG, etc.)"
+        )
+    
+    # Check file size (limit to 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB
+    try:
+        # Read the file
+        image_data = await file.read()
+        
+        if len(image_data) > max_size:
+            raise HTTPException(
+                status_code=400,
+                detail="Image file too large. Maximum size is 10MB."
+            )
+        
+        if len(image_data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded file is empty."
+            )
+            
+    except Exception as e:
+        logger.error(f"Error reading uploaded file: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Error reading uploaded image file."
+        )
+    
+    # Analyze the image
+    identification_result = identify_plant_from_image(image_data)
+    
+    if identification_result is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Error analyzing the image. Please try again."
+        )
+    
+    # Create response object
+    response = PlantIdentificationResponse(
+        is_plant=identification_result.get('is_plant', False),
+        common_name=identification_result.get('common_name'),
+        confidence=identification_result.get('confidence'),
+        message=identification_result.get('message', 'Analysis completed.')
+    )
+    
+    logger.info(f"Plant identification completed: {response.is_plant}, {response.common_name}")
+    return response
 
 @app.get("/health", status_code=200)
 async def health_check():
