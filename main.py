@@ -336,6 +336,7 @@ Please provide care instructions for this indoor houseplant. **Generate the outp
   "description": "[Brief description of the houseplant]",
   "type": "[Annual OR Perennial]",
   "indoorOutdoor": "Indoor",
+  "seasonality": null, // Not applicable for indoor plants
   "zone": null, // Indoor plants don't depend on zones
   "zoneSuitability": null, // Indoor plants don't have zone suitability
   "sun": "[Bright Light OR Medium Light OR Low Light]", // Indoor light requirements
@@ -456,6 +457,7 @@ Please provide detailed seed starting, planting, and care instructions for the f
   "description": "[Brief, general description of the plant]",
   "type": "[Annual OR Perennial]",
   "indoorOutdoor": "Outdoor",
+  "seasonality": "[Cool Season OR Warm Season OR N/A]",
   "zone": "[User USDA Hardiness Zone]",
   "zoneSuitability": "[match OR close OR far]", // Not directly stored in plants, used for logging if needed
   "sun": "[Full Sun OR Partial Shade OR Full Shade]", // Will be mapped to 'sun_requirements'
@@ -538,6 +540,7 @@ Important Instructions for Generation:
 
 Output MUST be a valid JSON object.
 Match Schema: Adhere strictly to the keys and expected data types (string, array of strings, nested objects/arrays) shown above.
+Seasonality: Use 'Cool Season' or 'Warm Season' for vegetables and annual flowers. Use 'N/A' for perennials, shrubs, and trees where this classification is not relevant.
 Correct Name: Use the standard common name for "plantName".
 Plant/Seed Months: Provide the single best month string or null if not applicable.
 Instructions: Provide seed/planting instructions as arrays of strings. Empty array `[]` if not applicable.
@@ -689,6 +692,7 @@ def store_result(
     plant_instructions = care_info.get('plantingInstructions') or []
     care_details = care_info.get('care', {})
     zone_suitability = care_info.get('zoneSuitability') # Extract zone suitability
+    seasonality = care_info.get('seasonality') # Extract seasonality
 
     # Basic validation for core data needed for insertion
     # For indoor plants, zone can be null; for outdoor plants, zone is required
@@ -744,6 +748,7 @@ def store_result(
             'seed_starting_instructions': seed_instructions,
             'planting_instructions': plant_instructions,
             'zone_suitability': zone_suitability, # Add zone suitability here
+            'seasonality': seasonality, # Add seasonality here
             # 'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat() # Let Supabase handle timestamp updates if configured
         }
 
