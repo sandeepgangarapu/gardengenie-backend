@@ -12,6 +12,7 @@ import json # Added for JSON parsing
 import base64 # Added for image encoding
 from fastapi.middleware.cors import CORSMiddleware # Added for CORS
 from typing import Optional, Any, List
+from openai import OpenAI
 
 # Supabase imports
 from supabase import create_client, Client
@@ -77,11 +78,16 @@ app.add_middleware(
 
 # --- OpenRouter Configuration ---
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-LLM_MODEL = "google/gemini-2.5-flash-preview"
+LLM_MODEL = "google/gemini-2.5-flash"
 
 if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY not found in environment variables.")
+    openai_client = None
+else:
+    openai_client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
 
 # --- Unsplash Configuration ---
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
@@ -166,16 +172,9 @@ def get_unsplash_image(plant_name: str) -> Optional[dict]:
 
 def classify_plant_environment(plant_name: str) -> str | None:
     """First determines if a plant is typically grown indoors or outdoors."""
-    if not OPENROUTER_API_KEY:
-        logger.error("OpenRouter API Key is missing.")
+    if not openai_client:
+        logger.error("OpenAI client is not initialized.")
         return None
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "Plant Care API",
-    }
 
     prompt = f"""
 Is the plant "{plant_name}" typically grown as an indoor houseplant or an outdoor garden plant?
@@ -189,18 +188,19 @@ Consider:
 Plant: {plant_name}
 Response:"""
 
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 10,
-        "temperature": 0.1,
-    }
-
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        classification = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        completion = openai_client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Plant Care API",
+            },
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=10,
+            temperature=0.1,
+        )
+        
+        classification = completion.choices[0].message.content.strip()
         
         if classification in ["Indoor", "Outdoor"]:
             logger.info(f"Plant '{plant_name}' classified as: {classification}")
@@ -216,8 +216,8 @@ Response:"""
 
 def identify_plant_from_image(image_data: bytes) -> dict | None:
     """Analyzes an uploaded image to determine if it contains a plant and identify it."""
-    if not OPENROUTER_API_KEY:
-        logger.error("OpenRouter API Key is missing.")
+    if not openai_client:
+        logger.error("OpenAI client is not initialized.")
         return None
 
     # Convert image bytes to base64
@@ -226,13 +226,6 @@ def identify_plant_from_image(image_data: bytes) -> dict | None:
     except Exception as e:
         logger.error(f"Error encoding image to base64: {e}")
         return None
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "Plant Care API",
-    }
 
     prompt = """
 Analyze this image and determine if it contains a plant, tree, shrub, or any gardening-related vegetation.
@@ -260,32 +253,33 @@ Examples of what counts as plants: houseplants, garden plants, trees, shrubs, fl
 Examples of what doesn't count: artificial plants, plant-printed items, drawings of plants, dead/dried plants unless clearly identifiable.
 """
 
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [
-            {
-                "role": "user", 
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_base64}"
-                        }
-                    }
-                ]
-            }
-        ],
-        "max_tokens": 300,
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"}
-    }
-
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        llm_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        completion = openai_client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Plant Care API",
+            },
+            model=LLM_MODEL,
+            messages=[
+                {
+                    "role": "user", 
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=300,
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+
+        llm_content = completion.choices[0].message.content.strip()
 
         if not llm_content:
             logger.warning("Received empty content from LLM for plant identification.")
@@ -306,22 +300,15 @@ Examples of what doesn't count: artificial plants, plant-printed items, drawings
             return None
 
     except Exception as e:
-        logger.error(f"Error calling OpenRouter API for plant identification: {e}")
+        logger.error(f"Error calling OpenAI client for plant identification: {e}")
         return None
 
 
 def call_openrouter_llm_indoor(plant_name: str) -> dict | None:
-    """Calls the OpenRouter API to get indoor plant care instructions as JSON."""
-    if not OPENROUTER_API_KEY:
-        logger.error("OpenRouter API Key is missing.")
+    """Calls the OpenAI client to get indoor plant care instructions as JSON."""
+    if not openai_client:
+        logger.error("OpenAI client is not initialized.")
         return None
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "Plant Care API",
-    }
 
     prompt = f"""
 Please provide care instructions for this indoor houseplant. **Generate the output strictly as a JSON object following the schema specified below.**
@@ -386,19 +373,20 @@ Important Instructions:
 - For timing, consider general indoor plant growth patterns (more active in spring/summer, slower in fall/winter)
 """
 
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1500,  # Increased to match outdoor function and accommodate full JSON
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"}
-    }
-
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        llm_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        completion = openai_client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Plant Care API",
+            },
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1500,
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+        
+        llm_content = completion.choices[0].message.content.strip()
 
         if not llm_content:
             logger.warning("Received empty content from LLM for indoor plant.")
@@ -423,22 +411,15 @@ Important Instructions:
             return None
 
     except Exception as e:
-        logger.error(f"Error calling OpenRouter API for indoor plant: {e}")
+        logger.error(f"Error calling OpenAI client for indoor plant: {e}")
         return None
 
 
 def call_openrouter_llm_outdoor(plant_name: str, user_zone: str) -> dict | None:
-    """Calls the OpenRouter API to get outdoor plant care instructions as JSON."""
-    if not OPENROUTER_API_KEY:
-        logger.error("OpenRouter API Key is missing.")
+    """Calls the OpenAI client to get outdoor plant care instructions as JSON."""
+    if not openai_client:
+        logger.error("OpenAI client is not initialized.")
         return None
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost", # Example referrer, replace if needed
-        "X-Title": "Plant Care API", # Example title, replace if needed
-    }
 
     # Updated prompt requesting JSON output (ensure it reflects schema)
     prompt = f"""
@@ -549,18 +530,20 @@ Care Section: Structure seasonal care exactly as shown. For each step, include `
 Priority/Season ENUMs: If `priority` or `season` columns in Supabase are ENUMs, ensure the generated strings match valid ENUM values exactly (e.g., 'spring', 'summer', 'fall', 'winter', 'must do', 'good to do', 'optional'). Use 'optional' if something is not critical.
 Completeness: Fill all fields. Use `null` for optional month fields if not applicable. Use empty arrays `[]` for instruction lists or seasonal care lists if empty.
 """
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1500, # Increased max_tokens for longer JSON output
-        "temperature": 0.2, # Kept temperature low for consistency
-        "response_format": {"type": "json_object"} # Request JSON output
-    }
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60) # Increased timeout
-        response.raise_for_status()
-        result = response.json()
-        llm_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        completion = openai_client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Plant Care API",
+            },
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1500,
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+        
+        llm_content = completion.choices[0].message.content.strip()
 
         if not llm_content:
              logger.warning("Received empty content from LLM.")
@@ -586,18 +569,9 @@ Completeness: Fill all fields. Use `null` for optional month fields if not appli
             logger.error(f"LLM Raw Content: {llm_content}")
             return None # Return None if JSON parsing fails
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error calling OpenRouter API: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            logger.error(f"OpenRouter Response Status: {e.response.status_code}")
-            logger.error(f"OpenRouter Response Text: {e.response.text}")
-        return None
-    except (KeyError, IndexError) as e:
-         logger.error(f"Error parsing OpenRouter response structure: {e} - Response: {response.text}")
-         return None
     except Exception as e:
-         logger.error(f"An unexpected error occurred during LLM call: {e}")
-         return None
+        logger.error(f"Error calling OpenAI client for outdoor plant: {e}")
+        return None
 
 def _store_plant_image(plant_name: str, image_data: dict) -> None:
     """Helper to find/insert/update plant image data in Supabase."""
