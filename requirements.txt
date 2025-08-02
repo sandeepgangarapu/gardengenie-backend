@@ -1,22 +1,9 @@
-annotated-types==0.7.0
-anyio==4.9.0
-certifi==2025.1.31
-charset-normalizer==3.4.1
-click==8.1.8
-exceptiongroup==1.2.2
-fastapi==0.115.12
-h11==0.16.0
-idna==3.10
-# psycopg2-binary==2.9.9 # Commented out as we are primarily using Supabase now
-pydantic==2.11.3
-pydantic_core==2.33.1
-python-dotenv>=0.15.0 # Ensure dotenv is present
-python-multipart==0.0.19 # Required for file uploads in FastAPI
-requests==2.32.3
-sniffio==1.3.1
-starlette==0.46.2
-typing-inspection==0.4.0
-typing_extensions==4.13.2
-urllib3==2.4.0
-uvicorn==0.34.2
-supabase>=1.0.0 # Ensure supabase-py is present
+# Core dependencies for Plant Care API
+fastapi>=0.115.0
+pydantic>=2.11.0
+uvicorn>=0.34.0
+python-dotenv>=0.15.0
+python-multipart>=0.0.19
+requests>=2.32.0
+openai>=1.0.0
+supabase>=2.0.0
