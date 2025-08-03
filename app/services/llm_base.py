@@ -1,10 +1,10 @@
-import requests
+from openai import OpenAI
 import json
 import logging
 import re
 from typing import Optional, Dict, Any
 
-from ..config import OPENROUTER_API_KEY, OPENROUTER_API_URL, LLM_MODEL
+from ..config import OPENROUTER_API_KEY, LLM_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -20,23 +20,29 @@ def extract_json_from_response(content: str) -> str:
         return content.strip()
 
 def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Helper function to make requests to OpenRouter API."""
+    """Helper function to make requests to OpenRouter API using OpenAI client."""
     if not OPENROUTER_API_KEY:
         logger.error("OpenRouter API Key is missing.")
         return None
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "Plant Care API",
-    }
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
 
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        raw_content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        completion = client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Plant Care API",
+            },
+            model=payload.get("model", LLM_MODEL),
+            messages=payload.get("messages", []),
+            max_tokens=payload.get("max_tokens", 3000),
+            temperature=payload.get("temperature", 0.2)
+        )
+        
+        raw_content = completion.choices[0].message.content.strip()
         
         # Extract JSON from markdown blocks if present
         clean_content = extract_json_from_response(raw_content)
@@ -45,7 +51,7 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             logger.warning("Received empty content from LLM.")
             return None
 
-        return {"content": clean_content, "raw_response": result}
+        return {"content": clean_content, "raw_response": completion.model_dump()}
     
     except Exception as e:
         logger.error(f"Error calling OpenRouter API: {e}")
