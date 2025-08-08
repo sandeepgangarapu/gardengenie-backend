@@ -527,7 +527,7 @@ Plant/Seed Months: Provide the single best month string or null if not applicabl
 Instructions: Provide seed/planting instructions as arrays of strings. Empty array `[]` if not applicable.
 Sun: Provide the sun preference string (e.g., "Full Sun").
 Care Section: Structure seasonal care exactly as shown. For each step, include `step`, `priority`, and `months`.
-Priority/Season ENUMs: If `priority` or `season` columns in Supabase are ENUMs, ensure the generated strings match valid ENUM values exactly (e.g., 'spring', 'summer', 'fall', 'winter', 'must do', 'good to do', 'optional'). Use 'optional' if something is not critical.
+    Priority/Care Phase ENUMs: If `priority` or `care_phase` columns in Supabase are ENUMs, ensure the generated strings match valid ENUM values exactly (e.g., 'spring', 'summer', 'fall', 'winter', 'must do', 'good to do', 'optional'). Use 'optional' if something is not critical.
 Completeness: Fill all fields. Use `null` for optional month fields if not applicable. Use empty arrays `[]` for instruction lists or seasonal care lists if empty.
 """
     try:
@@ -803,7 +803,7 @@ def store_result(
                          # Prepare dict for insertion matching table columns
                          instruction_row = {
                              'plant_id': plant_uuid, # Link to the plant
-                             'season': season, # Assuming string matches ENUM
+                               'care_phase': season, # Map season key to care_phase enum column
                              'months': step_detail.get('months'),
                              'step_description': step_detail.get('step'),
                              'priority': step_detail.get('priority'), # Assuming string matches ENUM
