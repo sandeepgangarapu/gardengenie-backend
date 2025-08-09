@@ -61,7 +61,11 @@ def identify_plant_from_image(image_data: bytes) -> Optional[Dict[str, Any]]:
                     "is_plant": {"type": "boolean"},
                     "message": {"type": "string"},
                     "common_name": {"type": ["string", "null"]},
-                    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+                    # Standardize confidence to string enum; allow null as well
+                    "confidence": {
+                        "type": ["string", "null"],
+                        "enum": ["high", "medium", "low", None]
+                    }
                 },
                 "required": ["is_plant", "message", "common_name", "confidence"]
             }
