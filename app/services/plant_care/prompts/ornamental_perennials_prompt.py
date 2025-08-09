@@ -15,6 +15,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
+  "typeSpecific": {{}},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Drought tolerant]",
@@ -31,64 +32,47 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
       "tip": "[Helpful hint about soil preparation, depth, spacing, etc.]"
     }}
   ],
-  "care_plan": [
-    {{
-      "task": "[Spring care tasks]",
-      "description": "[Spring pruning, fertilizing, emergence care, mulching]",
-      "priority": "[critical OR important OR beneficial]",
-      "timing": {{
-        "type": "seasonal",
-        "season": "spring",
-        "months": ["March", "April", "May"]
+  "care_plan": {{
+    "style": "seasons",
+    "tabs": [
+      {{
+        "key": "spring",
+        "label": "Spring",
+        "items": [
+          {{ "text": "[Prune, fertilize, mulch; support emerging growth]", "when": "[Mar–May in Zone {user_zone}]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "Annual spring tasks",
-      "tips": "[Zone-specific spring care timing]"
-    }},
-    {{
-      "task": "[Summer care tasks]",
-      "description": "[Watering, deadheading, pest monitoring, summer pruning]",
-      "priority": "[critical OR important OR beneficial]",
-      "timing": {{
-        "type": "seasonal",
-        "season": "summer",
-        "months": ["June", "July", "August"]
+      {{
+        "key": "summer",
+        "label": "Summer",
+        "items": [
+          {{ "text": "[Water, deadhead, manage heat and pests]", "when": "[Jun–Aug]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "Weekly to monthly",
-      "tips": "[Heat and drought management for the zone]"
-    }},
-    {{
-      "task": "[Fall care tasks]",
-      "description": "[Cleanup, division, transplanting, winter preparation]",
-      "priority": "[critical OR important OR beneficial]",
-      "timing": {{
-        "type": "seasonal",
-        "season": "fall",
-        "months": ["September", "October", "November"]
+      {{
+        "key": "fall",
+        "label": "Fall",
+        "items": [
+          {{ "text": "[Divide or transplant; clean up; prep for winter]", "when": "[Sep–Nov]", "priority": "good to do" }}
+        ]
       }},
-      "frequency": "Annual fall tasks",
-      "tips": "[Zone-specific winter preparation]"
-    }},
-    {{
-      "task": "[Winter care tasks]",
-      "description": "[Protection, dormant care, planning for next season]",
-      "priority": "[critical OR important OR beneficial]",
-      "timing": {{
-        "type": "seasonal",
-        "season": "winter",
-        "months": ["December", "January", "February"]
-      }},
-      "frequency": "Minimal winter care",
-      "tips": "[Zone-specific winter protection needs]"
-    }}
-  ]
+      {{
+        "key": "winter",
+        "label": "Winter",
+        "items": [
+          {{ "text": "[Protect crowns if needed; minimal watering]", "when": "[Dec–Feb]", "priority": "good to do" }}
+        ]
+      }}
+    ]
+  }}
 }}
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. All timing must be specific to Zone {user_zone} - adjust for local climate patterns
-2. Focus on long-term perennial care and maintenance through seasons
-3. Include pruning guidance specific to the plant type and bloom timing
-4. Cover seasonal bloom care, deadheading, and division timing
+1. All "when" values must be specific to Zone {user_zone} - adjust for local climate patterns
+2. Use seasonal tabs (Spring, Summer, Fall, Winter). Keep 1–3 concise items per tab (max 8 total)
+3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
+4. Cover bloom care, pruning, deadheading, and division timing
 5. Address both establishment (first year) and ongoing maintenance
 6. Include zone-specific challenges (heat, cold, humidity, pests)
 7. Provide division and propagation timing appropriate for the region

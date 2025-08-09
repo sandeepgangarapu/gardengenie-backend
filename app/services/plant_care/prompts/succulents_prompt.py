@@ -15,7 +15,9 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
-  "hardiness": "[Hardy to Zone X OR Tender, container only OR Cold-sensitive]",
+  "typeSpecific": {{
+    "hardiness": "[Hardy to Zone X OR Tender, container only OR Cold-sensitive]"
+  }},
   "requirements": {{
     "sun": "[Full Sun OR Bright Light OR Partial Shade]",
     "water": "[Soak and dry method OR Minimal winter water OR Deep, infrequent]",
@@ -31,51 +33,39 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
       "tip": "[Helpful hint about soil mix, container choice, etc.]"
     }}
   ],
-  "care_plan": [
-    {{
-      "task": "[Growing season care]",
-      "description": "[Active growing period watering and feeding]",
-      "priority": "important",
-      "timing": {{
-        "type": "seasonal",
-        "season": "spring_summer",
-        "months": ["April", "May", "June", "July", "August", "September"]
+  "care_plan": {{
+    "style": "lifecycle",
+    "tabs": [
+      {{
+        "key": "grow",
+        "label": "Grow",
+        "items": [
+          {{ "text": "[Water thoroughly then allow to dry; light feeding]", "when": "[Apr–Sep in Zone {user_zone}]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "When soil completely dry",
-      "tips": "[Zone-specific watering timing based on climate]"
-    }},
-    {{
-      "task": "[Winter dormancy care]",
-      "description": "[Reduced water and protection from cold]",
-      "priority": "critical",
-      "timing": {{
-        "type": "seasonal",
-        "season": "winter",
-        "months": ["November", "December", "January", "February", "March"]
+      {{
+        "key": "dormancy",
+        "label": "Dormancy",
+        "items": [
+          {{ "text": "[Reduce water to monthly or less; protect from cold]", "when": "[Nov–Mar]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "Monthly or less",
-      "tips": "[Zone-specific winter protection needs]"
-    }},
-    {{
-      "task": "[Repotting and propagation]",
-      "description": "[When and how to repot, propagation methods]",
-      "priority": "beneficial",
-      "timing": {{
-        "type": "recurring",
-        "interval": "2-3 years",
-        "best_season": "spring"
-      }},
-      "frequency": "Every 2-3 years",
-      "tips": "[Propagation techniques specific to this succulent]"
-    }}
-  ]
+      {{
+        "key": "repot",
+        "label": "Repot/Propagate",
+        "items": [
+          {{ "text": "[Repot every 2–3 years; propagate via cuttings or offsets]", "when": "[Best in spring]", "priority": "good to do" }}
+        ]
+      }}
+    ]
+  }}
 }}
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
 1. Address outdoor vs. container growing based on Zone {user_zone} hardiness
 2. Provide specific winter protection needs for this climate
-3. Include seasonal watering adjustments based on local climate patterns
-4. Address humidity challenges specific to the region
-5. Include propagation timing appropriate for the local growing season
+3. Use lifecycle tabs (Grow, Dormancy, Repot/Propagate). Keep 1–3 concise items per tab (max 8 total)
+4. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
+5. Address humidity challenges specific to the region and propagation timing
 """

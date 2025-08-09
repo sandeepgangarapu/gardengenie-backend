@@ -15,7 +15,9 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
   "type": "Annual",
   "seasonality": "[Cool Season OR Warm Season]",
   "zoneSuitability": "[match OR close OR far]",
-  "daysToBloom": "[e.g., 60-80 days OR 45 days to first flowers]",
+  "typeSpecific": {{
+    "daysToBloom": "[e.g., 60-80 days OR 45 days to first flowers]"
+  }},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Moderate]",
@@ -37,65 +39,34 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
       "tip": "[Helpful hint about transplanting, direct seeding, etc.]"
     }}
   ],
-  "care_plan": [
-    {{
-      "task": "[Establishment care]",
-      "description": "[Care during first 2-4 weeks after planting]",
-      "priority": "critical",
-      "timing": {{
-        "type": "relative",
-        "start": "planting",
-        "duration": "2-4 weeks"
+  "care_plan": {{
+    "style": "lifecycle",
+    "tabs": [
+      {{
+        "key": "grow_bloom",
+        "label": "Grow/Bloom",
+        "items": [
+          {{ "text": "[Water consistently and feed during bloom; stake/tie as needed]", "when": "[May–September in Zone {user_zone}]", "priority": "must do" }},
+          {{ "text": "[Deadhead spent flowers to extend blooming]", "when": "[Weekly during bloom]", "priority": "good to do" }}
+        ]
       }},
-      "frequency": "Daily monitoring",
-      "tips": "[Zone-specific establishment guidance]"
-    }},
-    {{
-      "task": "[Blooming season care]",
-      "description": "[Care during main blooming period - watering, feeding, support]",
-      "priority": "important",
-      "timing": {{
-        "type": "seasonal",
-        "season": "growing_season",
-        "months": ["May", "June", "July", "August", "September"]
-      }},
-      "frequency": "Weekly care",
-      "tips": "[Heat and humidity management]"
-    }},
-    {{
-      "task": "[Deadheading and maintenance]",
-      "description": "[Deadheading techniques for continued blooms, pinching, support]",
-      "priority": "important",
-      "timing": {{
-        "type": "recurring",
-        "frequency": "weekly",
-        "during": "bloom_period"
-      }},
-      "frequency": "Weekly during bloom",
-      "tips": "[Specific deadheading techniques for this flower]"
-    }},
-    {{
-      "task": "[End of season care]",
-      "description": "[Seed collection, cleanup, composting]",
-      "priority": "beneficial",
-      "timing": {{
-        "type": "seasonal",
-        "season": "fall",
-        "trigger": "after_first_frost"
-      }},
-      "frequency": "End of season",
-      "tips": "[Seed saving techniques if applicable]"
-    }}
-  ]
+      {{
+        "key": "end",
+        "label": "End",
+        "items": [
+          {{ "text": "[Collect seeds and remove plants after first frost]", "when": "[After first frost in Zone {user_zone}]", "priority": "good to do" }}
+        ]
+      }}
+    ]
+  }}
 }}
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
 1. All timing must be specific to Zone {user_zone} - use local frost dates and growing season
-2. Focus on the complete growing cycle from seed to end of season
-3. Provide specific timing for seed starting and planting for this zone
-4. Include succession planting advice if applicable for extended blooms
-5. Cover deadheading techniques for continued flower production
-6. Address zone-specific challenges (heat, humidity, short seasons)
-7. Include seed collection and saving tips if relevant to the variety
+2. Keep seed starting and planting in their dedicated sections; care_plan should only contain post-plant lifecycle tasks (Grow/Bloom, End)
+3. Include succession planting advice in care_plan only if it affects in‑season management
+4. Cover deadheading techniques for continued flower production
+5. Address zone-specific challenges (heat, humidity, short seasons)
+6. Include seed collection and saving tips if relevant to the variety
 """

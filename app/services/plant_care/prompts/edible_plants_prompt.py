@@ -15,7 +15,9 @@ Act as a Zone-Aware Master Gardener providing comprehensive growing guidance for
   "type": "Annual",
   "seasonality": "[Cool Season OR Warm Season]",
   "zoneSuitability": "[match OR close OR far]",
-  "daysToMaturity": "[e.g., 60-80 days OR 45 days to first harvest]",
+  "typeSpecific": {{
+    "daysToMaturity": "[e.g., 60-80 days OR 45 days to first harvest]"
+  }},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Moderate]",
@@ -37,53 +39,43 @@ Act as a Zone-Aware Master Gardener providing comprehensive growing guidance for
       "tip": "[Helpful hint or technique]"
     }}
   ],
-  "care_plan": [
-    {{
-      "task": "[Specific care task - e.g., 'Establish seedlings']",
-      "description": "[Detailed explanation of the task and techniques]",
-      "priority": "[critical OR important OR beneficial]",
-      "timing": {{
-        "type": "relative",
-        "start": "planting",
-        "duration": "2-4 weeks"
+  "care_plan": {{
+    "style": "lifecycle",
+    "tabs": [
+      {{
+        "key": "grow",
+        "label": "Grow",
+        "items": [
+          {{ "text": "[Water consistently; mulch; side-dress or feed as appropriate]", "when": "[During active growth, e.g., May–August]", "priority": "must do" }},
+          {{ "text": "[Succession sow every 2–3 weeks for continuous harvest]", "when": "[Every 2–3 weeks until ~8 weeks before first frost]", "priority": "good to do" }}
+        ]
       }},
-      "frequency": "Daily monitoring",
-      "tips": "[Zone-specific advice or warnings]"
-    }},
-    {{
-      "task": "[Another task - e.g., 'Succession planting']",
-      "description": "[Detailed explanation]",
-      "priority": "[critical OR important OR beneficial]",
-      "timing": {{
-        "type": "recurring",
-        "interval": "2-3 weeks",
-        "season_end": "8 weeks before first frost"
+      {{
+        "key": "harvest",
+        "label": "Harvest",
+        "items": [
+          {{ "text": "[Harvest at maturity using crop-specific indicators]", "when": "[Zone {user_zone} window, e.g., Jun–Sep]", "priority": "must do" }},
+          {{ "text": "[Handle and store properly for best shelf life]", "when": "[Immediately after harvest]", "priority": "good to do" }}
+        ]
       }},
-      "frequency": "Every 2-3 weeks",
-      "tips": "[Zone-specific timing advice]"
-    }},
-    {{
-      "task": "[Harvest task]",
-      "description": "[Harvesting techniques and timing indicators]",
-      "priority": "critical",
-      "timing": {{
-        "type": "maturity",
-        "indicators": ["Size reached", "Color change", "Texture signs"]
-      }},
-      "frequency": "As ready",
-      "tips": "[Storage and post-harvest handling]"
-    }}
-  ]
+      {{
+        "key": "end",
+        "label": "End",
+        "items": [
+          {{ "text": "[Remove spent plants; compost debris; prep beds for next crop]", "when": "[After final harvest or first frost]", "priority": "good to do" }}
+        ]
+      }}
+    ]
+  }}
 }}
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. All timing must be specific to Zone {user_zone} - use local frost dates, growing season length
-2. Create comprehensive, multi-step care_plan with distinct task objects
-3. Include zone-specific challenges (heat, humidity, pests common to the region)
-4. Provide exact timing for seed starting, planting, and succession planting for this zone
+1. All "when" values must be specific to Zone {user_zone} (use local frost dates and season length)
+2. Keep seed starting and planting in their dedicated sections; care_plan should only cover Grow, Harvest, End (post‑plant tasks)
+3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
+4. Include succession planting guidance in Grow; pest/disease monitoring where relevant
 5. Include companion planting recommendations and plants to avoid
 6. Add expected yields and days to maturity information
 7. Address soil preparation needs specific to the region
-8. Include integrated pest management appropriate for edible crops
 """

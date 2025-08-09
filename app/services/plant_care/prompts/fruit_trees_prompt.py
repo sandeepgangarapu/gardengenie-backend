@@ -15,6 +15,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
+  "typeSpecific": {{}},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Moderate]",
@@ -31,64 +32,47 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
       "tip": "[Helpful hint about hole preparation, root handling, etc.]"
     }}
   ],
-  "care_plan": [
-    {{
-      "task": "[Establishment care]",
-      "description": "[Care during first 1-3 years - root development, structural pruning, protection, consistent watering]",
-      "priority": "critical",
-      "timing": {{
-        "type": "relative",
-        "start": "planting",
-        "duration": "first 3 years"
+  "care_plan": {{
+    "style": "seasons",
+    "tabs": [
+      {{
+        "key": "spring",
+        "label": "Spring",
+        "items": [
+          {{ "text": "[Fertilize and perform formative pruning; monitor pests]", "when": "[Mar–May in Zone {user_zone}]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "Ongoing during establishment",
-      "tips": "[Zone-specific establishment guidance]"
-    }},
-    {{
-      "task": "[Growing season care]",
-      "description": "[Active season care - watering, fertilizing, pest monitoring, summer pruning]",
-      "priority": "important",
-      "timing": {{
-        "type": "seasonal",
-        "season": "spring_summer",
-        "months": ["March", "April", "May", "June", "July", "August"]
+      {{
+        "key": "summer",
+        "label": "Summer",
+        "items": [
+          {{ "text": "[Water deeply, thin fruit if heavy set; manage pests/disease]", "when": "[Jun–Aug]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "Monthly monitoring",
-      "tips": "[Zone-specific growing season advice]"
-    }},
-    {{
-      "task": "[Fruit production and harvest]",
-      "description": "[Fruit thinning, harvest timing, post-harvest care]",
-      "priority": "critical",
-      "timing": {{
-        "type": "maturity",
-        "indicators": ["Fruit color", "Fruit size", "Easy separation from branch"]
+      {{
+        "key": "fall",
+        "label": "Fall",
+        "items": [
+          {{ "text": "[Harvest at correct maturity; post-harvest sanitation]", "when": "[Based on variety window in Zone {user_zone}]", "priority": "must do" }}
+        ]
       }},
-      "frequency": "During harvest season",
-      "tips": "[Storage and handling techniques]"
-    }},
-    {{
-      "task": "[Dormant season maintenance]",
-      "description": "[Dormant pruning, winter protection, annual fertilizing, disease prevention]",
-      "priority": "important",
-      "timing": {{
-        "type": "seasonal",
-        "season": "winter",
-        "months": ["December", "January", "February"]
-      }},
-      "frequency": "Annual",
-      "tips": "[Zone-specific winter care and pruning timing]"
-    }}
-  ]
+      {{
+        "key": "winter",
+        "label": "Winter",
+        "items": [
+          {{ "text": "[Dormant pruning and winter protection where needed]", "when": "[Dec–Feb]", "priority": "good to do" }}
+        ]
+      }}
+    ]
+  }}
 }}
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. All timing must be specific to Zone {user_zone} - use local frost dates and growing season
-2. Include pruning guidance specific to fruit trees at appropriate lifecycle stages
-3. Address zone-specific challenges (cold hardiness, heat tolerance, disease pressure)
-4. Provide exact planting timing for this zone (early spring or fall)
-5. Include harvest timing and techniques specific to the fruit type
-6. Address pollination requirements and compatible varieties for the region
-7. Include integrated pest and disease management for fruit production
+1. All "when" values must be specific to Zone {user_zone} - use local frost dates and growing season
+2. Use seasonal tabs (Spring, Summer, Fall, Winter). Keep 1–3 concise items per tab (max 8 total)
+3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
+4. Include pruning guidance, harvest timing, and storage techniques for the fruit type
+5. Address pollination requirements and compatible varieties for the region
+6. Include integrated pest and disease management for fruit production
 """

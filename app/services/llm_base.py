@@ -43,15 +43,14 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         )
         
         raw_content = completion.choices[0].message.content.strip()
-        
         # Extract JSON from markdown blocks if present
         clean_content = extract_json_from_response(raw_content)
-        
         if not clean_content:
             logger.warning("Received empty content from LLM.")
             return None
 
-        return {"content": clean_content, "raw_response": completion.model_dump()}
+        # Include both the clean JSON content and the full raw response object
+        return {"content": clean_content, "raw_response": completion.model_dump(), "raw_text": raw_content}
     
     except Exception as e:
         logger.error(f"Error calling OpenRouter API: {e}")
@@ -72,6 +71,13 @@ def validate_and_parse_response(result: Dict[str, Any], required_keys: list, pla
         if not all(k in care_info for k in required_keys):
             logger.error(f"LLM JSON missing essential keys for {plant_type}: {care_info}")
             return None
+        # Attach raw payload for downstream persistence
+        try:
+            care_info["__raw_llm_response"] = result.get("raw_response")
+            care_info["__raw_llm_text"] = result.get("raw_text") or result.get("content")
+        except Exception:
+            # Non-fatal; continue without raw attachment
+            pass
         logger.info(f"LLM ({LLM_MODEL}) returned valid JSON for {plant_type} '{plant_name}'")
         return care_info
     except json.JSONDecodeError as json_e:

@@ -206,20 +206,30 @@ def store_plant_and_care_instructions(
     seasonality = care_info.get('seasonality')
     final_plant_group = plant_group or care_info.get('plant_group')
 
+    # New structured fields to persist losslessly in JSONB columns
+    requirements_json = care_info.get('requirements')
+    # Accept either camelCase 'typeSpecific' from prompt or snake_case fallback
+    type_specific_json = care_info.get('typeSpecific') or care_info.get('type_specific')
+    seed_starting_json = care_info.get('seed_starting')
+    planting_json = care_info.get('planting')
+    care_plan_json = care_info.get('care_plan')
+    # Capture entire raw llm response if present on care_info
+    raw_llm_response_json = care_info.get('__raw_llm_response')
+    raw_llm_text = care_info.get('__raw_llm_text')
+
     # Basic validation for core data needed for insertion
     if not plant_name or (not zone and final_plant_group not in ['Houseplants', 'Succulents']):
         logger.error(f"Missing essential plantName or zone in care_info: {care_info}")
         return False
 
-    # Validate care structure before proceeding with database operations
-    care_validation = validate_care_structure(care_details, plant_name)
-    
-    if not care_validation['valid']:
-        logger.error(f"Invalid care structure for '{plant_name}': {care_validation['errors']}")
-        return False
-    
-    if care_validation['warnings']:
-        logger.warning(f"Care structure warnings for '{plant_name}': {care_validation['warnings']}")
+    # Validate legacy care structure only if no new care_plan is present
+    if not care_plan_json:
+        care_validation = validate_care_structure(care_details, plant_name)
+        if not care_validation['valid']:
+            logger.error(f"Invalid care structure for '{plant_name}': {care_validation['errors']}")
+            return False
+        if care_validation['warnings']:
+            logger.warning(f"Care structure warnings for '{plant_name}': {care_validation['warnings']}")
 
     plant_uuid: Optional[str] = None
 
@@ -264,6 +274,16 @@ def store_plant_and_care_instructions(
             'zone_suitability': zone_suitability,
             'seasonality': seasonality,
             'plant_group': final_plant_group,
+            # New JSONB fields
+            'requirements': requirements_json,
+            'type_specific': type_specific_json,
+            'seed_starting': seed_starting_json,
+            'planting': planting_json,
+            'care_plan': care_plan_json,
+            # Model used for generation
+            'model_used': model_used,
+            # Full raw LLM response for traceability
+            'raw_llm_response': raw_llm_response_json,
         }
 
         if response.data and len(response.data) > 0:
@@ -321,39 +341,106 @@ def store_plant_and_care_instructions(
         if delete_response is None:
             logger.warning("Supabase delete execution returned None. Cannot confirm deletion of old care instructions.")
 
-        # Prepare and Insert New Care Phase Instructions with enhanced validation
+        # Prepare and Insert New Care Phase Instructions based on new care_plan (preferred) or legacy care
         care_instructions_to_insert = []
         skipped_instructions = 0
-        
-        for care_phase, steps in care_details.items():
-            if not isinstance(steps, list):
-                logger.error(f"Invalid care phase data for '{care_phase}': expected list, got {type(steps).__name__}. Skipping care phase.")
-                skipped_instructions += 1
-                continue
-                
-            for i, step_detail in enumerate(steps):
-                if not isinstance(step_detail, dict):
-                    logger.error(f"Invalid step data in care phase '{care_phase}', position {i+1}: expected dict, got {type(step_detail).__name__}. Skipping step.")
+
+        def map_phase_from_tab(style: str, tab_key: str, tab_label: str, group: Optional[str]) -> str:
+            normalized_key = (tab_key or '').strip().lower()
+            normalized_label = (tab_label or '').strip().lower()
+            style_normalized = (style or '').strip().lower()
+
+            if style_normalized == 'seasons':
+                for candidate in (normalized_key, normalized_label):
+                    if candidate in {'spring', 'summer', 'fall', 'winter'}:
+                        return candidate
+                return 'seasonal_maintenance'
+
+            if style_normalized == 'indoor':
+                if normalized_key == 'year_round' or normalized_label == 'year‑round' or normalized_label == 'year-round':
+                    return 'seasonal_maintenance'
+                if normalized_key in {'summer', 'winter'}:
+                    return normalized_key
+                return 'seasonal_maintenance'
+
+            # lifecycle and unknown styles
+            if normalized_key in {'grow', 'growing'}:
+                return 'growing_season'
+            if normalized_key in {'grow_bloom', 'bloom', 'blooming'}:
+                return 'blooming_season'
+            if normalized_key in {'harvest'}:
+                return 'harvest'
+            if normalized_key in {'end', 'end_of_season'}:
+                return 'end_of_season'
+            if normalized_key in {'post_bloom', 'post‑bloom', 'post-bloom'}:
+                return 'seasonal_maintenance'
+            if normalized_key in {'dormancy', 'dormant'}:
+                return 'seasonal_maintenance'
+            if normalized_key in {'repot', 'repot_propagate', 'repot/propagate'}:
+                return 'maintenance'
+            # Fallbacks using label
+            if normalized_label in {'spring', 'summer', 'fall', 'winter'}:
+                return normalized_label
+            return 'seasonal_maintenance'
+
+        if care_plan_json and isinstance(care_plan_json, dict):
+            style = care_plan_json.get('style')
+            tabs = care_plan_json.get('tabs') or []
+            if not isinstance(tabs, list):
+                logger.warning(f"care_plan.tabs is not a list for '{plant_name}'. Skipping care_plan ingestion.")
+            else:
+                for tab in tabs:
+                    if not isinstance(tab, dict):
+                        skipped_instructions += 1
+                        continue
+                    care_phase = map_phase_from_tab(style, tab.get('key'), tab.get('label'), final_plant_group)
+                    items = tab.get('items') or []
+                    if not isinstance(items, list):
+                        skipped_instructions += 1
+                        continue
+                    for i, item in enumerate(items):
+                        if not isinstance(item, dict):
+                            skipped_instructions += 1
+                            continue
+                        text_value = item.get('text')
+                        if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                            skipped_instructions += 1
+                            continue
+                        instruction_row = {
+                            'plant_id': plant_uuid,
+                            'care_phase': care_phase,
+                            'months': item.get('when'),
+                            'step_description': text_value.strip(),
+                            'priority': item.get('priority'),
+                            'order_within_season': i + 1,
+                        }
+                        care_instructions_to_insert.append(instruction_row)
+        else:
+            # Legacy path using 'care' dict with list of steps
+            for care_phase, steps in care_details.items():
+                if not isinstance(steps, list):
+                    logger.error(f"Invalid care phase data for '{care_phase}': expected list, got {type(steps).__name__}. Skipping care phase.")
                     skipped_instructions += 1
                     continue
-                
-                # Validate required fields
-                step_description = step_detail.get('step')
-                if not step_description or not isinstance(step_description, str) or not step_description.strip():
-                    logger.error(f"Missing or invalid step description in care phase '{care_phase}', position {i+1}. Skipping step.")
-                    skipped_instructions += 1
-                    continue
-                
-                # Create instruction row with validated data
-                instruction_row = {
-                    'plant_id': plant_uuid,
-                    'care_phase': care_phase,
-                    'months': step_detail.get('months'),
-                    'step_description': step_description.strip(),
-                    'priority': step_detail.get('priority'),
-                    'order_within_season': i + 1
-                }
-                care_instructions_to_insert.append(instruction_row)
+                for i, step_detail in enumerate(steps):
+                    if not isinstance(step_detail, dict):
+                        logger.error(f"Invalid step data in care phase '{care_phase}', position {i+1}: expected dict, got {type(step_detail).__name__}. Skipping step.")
+                        skipped_instructions += 1
+                        continue
+                    step_description = step_detail.get('step')
+                    if not step_description or not isinstance(step_description, str) or not step_description.strip():
+                        logger.error(f"Missing or invalid step description in care phase '{care_phase}', position {i+1}. Skipping step.")
+                        skipped_instructions += 1
+                        continue
+                    instruction_row = {
+                        'plant_id': plant_uuid,
+                        'care_phase': care_phase,
+                        'months': step_detail.get('months'),
+                        'step_description': step_description.strip(),
+                        'priority': step_detail.get('priority'),
+                        'order_within_season': i + 1
+                    }
+                    care_instructions_to_insert.append(instruction_row)
         
         # Log any skipped instructions
         if skipped_instructions > 0:
