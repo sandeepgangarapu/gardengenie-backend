@@ -6,11 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Running the Application
 ```bash
-# Local development
-python main.py
-
-# Using uvicorn directly
-uvicorn main:app --host 0.0.0.0 --port 8000
+# Local development (recommended)
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # Install dependencies
 pip install -r requirements.txt
@@ -21,8 +18,8 @@ pip install -r requirements.txt
 # Build Docker image
 docker build -t plant-care-api .
 
-# Run container (port is set via PORT env var)
-docker run -p 8000:8000 -e PORT=8000 plant-care-api
+# Run container (PORT env var optional; defaults to 8080 inside container)
+docker run -p 8000:8080 -e PORT=8080 plant-care-api
 ```
 
 ## Architecture Overview
@@ -32,8 +29,7 @@ This is a FastAPI-based Plant Care API that provides AI-powered plant identifica
 ### Core Components
 
 **Main Application Structure:**
-- `main.py` - Entry point that imports and runs the FastAPI app
-- `app/main.py` - FastAPI application with two main endpoints
+- `app/main.py` - FastAPI application with endpoints and local dev run guard
 - `app/config.py` - Configuration management with environment variables
 
 **Key Services:**

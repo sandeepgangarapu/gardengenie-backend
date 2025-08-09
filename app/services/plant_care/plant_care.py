@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Dict, Any
 
 from ..llm_base import make_llm_request, create_payload, validate_and_parse_response
+from ...config import LLM_MODEL
 from .prompts.houseplants_prompt import HOUSEPLANTS_PROMPT
 from .prompts.edible_plants_prompt import EDIBLE_PLANTS_PROMPT
 from .prompts.fruit_trees_prompt import FRUIT_TREES_PROMPT
@@ -50,7 +51,12 @@ def call_openrouter_llm_dispatch(group_key: str, plant_name: str, user_zone: str
     result = make_llm_request(payload)
     return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
 
-def generate_plant_care_instructions(plant_name: str, user_zone: str, perform_image_handling: bool = True) -> Optional[Dict[str, Any]]:
+def generate_plant_care_instructions(
+    plant_name: str,
+    user_zone: str,
+    perform_image_handling: bool = True,
+    persist_to_db: bool = True,
+) -> Optional[Dict[str, Any]]:
     """
     Generate complete plant care instructions for a given plant and zone.
     
@@ -76,19 +82,25 @@ def generate_plant_care_instructions(plant_name: str, user_zone: str, perform_im
         logger.error(f"Failed to generate care instructions for '{plant_name}' using group '{prompt_function}'")
         return None
 
-    # Step 3: Store results in database
-    storage_success = store_plant_and_care_instructions(
-        original_plant_name=plant_name,
-        original_user_zone=user_zone,
-        care_info=care_info,
-        model_used="google/gemini-2.5-flash-preview",  # Could be moved to config
-        plant_group=plant_group
-    )
-    
-    if not storage_success:
-        logger.error("Failed to store primary plant/care information in Supabase.")
-        # Still return the care_info even if storage fails
-        # The API can decide whether to raise an error or not
+    # Step 3: Optionally store results in database
+    if persist_to_db:
+        raw_llm_response = care_info.get('__raw_llm_response') if isinstance(care_info, dict) else None
+        resolved_model_used = (
+            raw_llm_response.get('model') if isinstance(raw_llm_response, dict) and raw_llm_response.get('model') else LLM_MODEL
+        )
+
+        storage_success = store_plant_and_care_instructions(
+            original_plant_name=plant_name,
+            original_user_zone=user_zone,
+            care_info=care_info,
+            model_used=resolved_model_used,
+            plant_group=plant_group
+        )
+        
+        if not storage_success:
+            logger.error("Failed to store primary plant/care information in Supabase.")
+            # Still return the care_info even if storage fails
+            # The API can decide whether to raise an error or not
     
     # Step 4: Optionally fetch and store image (can be moved to background)
     if perform_image_handling:

@@ -15,6 +15,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
+  "seedStartingMonth": null,
+  "plantingMonth": "[Month(s) or range for planting/division; e.g., Apr–May or Sep–Oct]",
   "typeSpecific": {{}},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
@@ -39,7 +41,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
         "key": "spring",
         "label": "Spring",
         "items": [
-          {{ "text": "[Prune, fertilize, mulch; support emerging growth]", "when": "[Mar–May in Zone {user_zone}]", "priority": "must do" }}
+          {{ "text": "[Prune, fertilize, mulch; support emerging growth]", "when": "[Mar–May]", "priority": "must do" }}
         ]
       }},
       {{
@@ -69,7 +71,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. All "when" values must be specific to Zone {user_zone} - adjust for local climate patterns
+1. All "when" values must be tied to local climate patterns. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Use seasonal tabs (Spring, Summer, Fall, Winter). Keep 1–3 concise items per tab (max 8 total)
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
 4. Cover bloom care, pruning, deadheading, and division timing

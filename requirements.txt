@@ -1,7 +1,10 @@
-fastapi
-uvicorn
-python-dotenv
-python-multipart
-requests
-openai
-supabase
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-dotenv==1.0.1
+python-multipart==0.0.9
+requests==2.31.0
+httpx==0.26.0
+tenacity==8.2.3
+openai==1.37.0
+supabase==2.7.4
+pydantic-settings==2.4.0

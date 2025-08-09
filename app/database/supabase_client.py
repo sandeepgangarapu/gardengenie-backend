@@ -608,16 +608,14 @@ def health_check() -> Dict[str, Any]:
     
     db_status = "unknown"
     try:
-        # Simple query to check connection
-        response = client.table('plants').select('plant_id', count='exact').limit(0).execute()
-        
+        # Lightweight health probe: fetch up to 1 row without exact count
+        response = client.table('plants').select('plant_id').limit(1).execute()
+
         if response is None:
-             db_status = "failed (query returned None)"
-        elif hasattr(response, 'count') and response.count is not None:
-             db_status = "successful"
+            db_status = "failed (query returned None)"
         else:
-             logger.warning(f"Health check Supabase query response unexpected: {response!r}")
-             db_status = "failed (unexpected response format)"
+            # If no exception and we got a response object, consider it successful
+            db_status = "successful"
 
     except APIError as api_e:
         logger.error(f"Health check Supabase API error: {api_e.message}")

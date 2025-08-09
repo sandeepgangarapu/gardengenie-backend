@@ -3,8 +3,10 @@ import logging
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import JSONResponse
 
-from .config import APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS
+from .config import APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS, MAX_UPLOAD_MB
 from .models import PlantCareInput, PlantIdentificationResponse, PlantCareResponse
 from .services.plant_care.plant_care import generate_plant_care_instructions, fetch_and_store_image_for_plant
 from .services.plant_identification.plant_identification import identify_plant_from_uploaded_image, validate_image_data
@@ -29,6 +31,33 @@ app.add_middleware(
     max_age=86400,
 )
 
+# --- Request Size Limiting Middleware ---
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests exceeding MAX_UPLOAD_MB based on Content-Length header."""
+
+    def __init__(self, app: FastAPI, max_upload_mb: int = 10) -> None:
+        super().__init__(app)
+        self.max_bytes = max_upload_mb * 1024 * 1024
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        content_length_header = request.headers.get("content-length")
+        if content_length_header:
+            try:
+                content_length = int(content_length_header)
+                if content_length > self.max_bytes:
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "detail": f"Request too large. Maximum allowed size is {self.max_bytes // (1024 * 1024)}MB"
+                        },
+                    )
+            except ValueError:
+                # If Content-Length is malformed, fall through to normal processing
+                pass
+        return await call_next(request)
+
+app.add_middleware(RequestSizeLimitMiddleware, max_upload_mb=MAX_UPLOAD_MB)
+
 # --- API Endpoints ---
 
 @app.post("/plant-care-instructions", response_model=PlantCareResponse)
@@ -51,7 +80,8 @@ async def get_plant_care_instructions(payload: PlantCareInput, request: Request,
         generate_plant_care_instructions,
         plant_name,
         user_zone,
-        False  # skip image handling in-request
+        False,               # skip image handling in-request
+        payload.persist,     # control DB upsert per request; default True
     )
     
     if care_info is None:
@@ -82,8 +112,16 @@ async def identify_plant(file: UploadFile = File(...)):
     
     # Read and validate the file
     try:
-        image_data = await file.read()
-        validation_result = validate_image_data(image_data)
+        max_bytes = MAX_UPLOAD_MB * 1024 * 1024
+        image_data = await file.read(max_bytes + 1)
+
+        if len(image_data) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Uploaded image too large. Maximum size is {MAX_UPLOAD_MB}MB",
+            )
+
+        validation_result = validate_image_data(image_data, max_size_mb=MAX_UPLOAD_MB)
         
         if not validation_result["valid"]:
             raise HTTPException(

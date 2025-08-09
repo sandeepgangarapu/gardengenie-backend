@@ -15,6 +15,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
+  "seedStartingMonth": null,
+  "plantingMonth": "[Month(s) or range for planting; e.g., Mar–Apr for bare-root or Oct–Nov in mild climates]",
   "typeSpecific": {{}},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
@@ -39,7 +41,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
         "key": "spring",
         "label": "Spring",
         "items": [
-          {{ "text": "[Fertilize and perform formative pruning; monitor pests]", "when": "[Mar–May in Zone {user_zone}]", "priority": "must do" }}
+          {{ "text": "[Fertilize and perform formative pruning; monitor pests]", "when": "[Mar–May]", "priority": "must do" }}
         ]
       }},
       {{
@@ -53,7 +55,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
         "key": "fall",
         "label": "Fall",
         "items": [
-          {{ "text": "[Harvest at correct maturity; post-harvest sanitation]", "when": "[Based on variety window in Zone {user_zone}]", "priority": "must do" }}
+          {{ "text": "[Harvest at correct maturity; post-harvest sanitation]", "when": "[Based on variety window]", "priority": "must do" }}
         ]
       }},
       {{
@@ -69,7 +71,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. All "when" values must be specific to Zone {user_zone} - use local frost dates and growing season
+1. All "when" values must reference local frost dates and growing season. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Use seasonal tabs (Spring, Summer, Fall, Winter). Keep 1–3 concise items per tab (max 8 total)
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
 4. Include pruning guidance, harvest timing, and storage techniques for the fruit type

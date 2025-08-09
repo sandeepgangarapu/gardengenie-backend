@@ -15,6 +15,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
+  "seedStartingMonth": null,
+  "plantingMonth": "[Month(s) or range for outdoor/container planting; e.g., Apr–May after frost or anytime indoors]",
   "typeSpecific": {{
     "hardiness": "[Hardy to Zone X OR Tender, container only OR Cold-sensitive]"
   }},
@@ -40,7 +42,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
         "key": "grow",
         "label": "Grow",
         "items": [
-          {{ "text": "[Water thoroughly then allow to dry; light feeding]", "when": "[Apr–Sep in Zone {user_zone}]", "priority": "must do" }}
+          {{ "text": "[Water thoroughly then allow to dry; light feeding]", "when": "[Apr–Sep]", "priority": "must do" }}
         ]
       }},
       {{
@@ -63,7 +65,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. Address outdoor vs. container growing based on Zone {user_zone} hardiness
+1. Address outdoor vs. container growing based on local hardiness conditions. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Provide specific winter protection needs for this climate
 3. Use lifecycle tabs (Grow, Dormancy, Repot/Propagate). Keep 1–3 concise items per tab (max 8 total)
 4. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".

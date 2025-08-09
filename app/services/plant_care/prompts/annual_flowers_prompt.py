@@ -15,6 +15,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
   "type": "Annual",
   "seasonality": "[Cool Season OR Warm Season]",
   "zoneSuitability": "[match OR close OR far]",
+  "seedStartingMonth": "[Month(s) or range for starting seeds; e.g., Feb–Mar indoors]",
+  "plantingMonth": "[Month(s) or range for transplanting/direct sowing; e.g., Apr–May after last frost]",
   "typeSpecific": {{
     "daysToBloom": "[e.g., 60-80 days OR 45 days to first flowers]"
   }},
@@ -46,7 +48,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
         "key": "grow_bloom",
         "label": "Grow/Bloom",
         "items": [
-          {{ "text": "[Water consistently and feed during bloom; stake/tie as needed]", "when": "[May–September in Zone {user_zone}]", "priority": "must do" }},
+          {{ "text": "[Water consistently and feed during bloom; stake/tie as needed]", "when": "[May–September]", "priority": "must do" }},
           {{ "text": "[Deadhead spent flowers to extend blooming]", "when": "[Weekly during bloom]", "priority": "good to do" }}
         ]
       }},
@@ -54,7 +56,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
         "key": "end",
         "label": "End",
         "items": [
-          {{ "text": "[Collect seeds and remove plants after first frost]", "when": "[After first frost in Zone {user_zone}]", "priority": "good to do" }}
+          {{ "text": "[Collect seeds and remove plants after first frost]", "when": "[After first frost]", "priority": "good to do" }}
         ]
       }}
     ]
@@ -63,8 +65,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. All timing must be specific to Zone {user_zone} - use local frost dates and growing season
-2. Keep seed starting and planting in their dedicated sections; care_plan should only contain post-plant lifecycle tasks (Grow/Bloom, End)
+1. All timing must use local frost dates and growing season. Do not include the words "Zone" or phrases like "in Zone {user_zone}" anywhere (not in text, tips, or when fields). Use only months/ranges or relative phrases.
+2. Provide concise summary fields: seedStartingMonth and plantingMonth (month names/ranges only, no "Zone" wording). Keep seed starting and planting details in their dedicated sections; care_plan should only contain post-plant lifecycle tasks (Grow/Bloom, End)
 3. Include succession planting advice in care_plan only if it affects in‑season management
 4. Cover deadheading techniques for continued flower production
 5. Address zone-specific challenges (heat, humidity, short seasons)

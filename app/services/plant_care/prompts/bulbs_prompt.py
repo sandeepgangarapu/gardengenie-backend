@@ -15,6 +15,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
   "type": "Perennial",
   "seasonality": "[Spring-blooming OR Summer-blooming OR Fall-blooming]",
   "zoneSuitability": "[match OR close OR far]",
+  "seedStartingMonth": null,
+  "plantingMonth": "[Month(s) or range for planting bulbs; e.g., Sep–Nov for spring bulbs or Mar–Apr for summer bulbs]",
   "typeSpecific": {{
     "bulbType": "[True bulb OR Corm OR Tuber OR Rhizome]"
   }},
@@ -56,7 +58,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-1. Provide exact planting timing for Zone {user_zone} based on soil temperature and frost dates
+1. Provide exact planting timing based on soil temperature and frost dates. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Keep planting guidance in the planting section; care_plan should only cover Grow and Post‑Bloom (post‑plant tasks). Keep 1–3 items per tab
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
 4. Include pre-chilling requirements if needed for this zone

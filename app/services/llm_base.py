@@ -5,7 +5,7 @@ import re
 from typing import Optional, Dict, Any
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from ..config import OPENROUTER_API_KEY, LLM_MODEL, LLM_TIMEOUT_SECONDS, LLM_MAX_RETRIES
+from ..config import OPENROUTER_API_KEY, LLM_MODEL, LLM_TIMEOUT_SECONDS, LLM_MAX_RETRIES, USE_STRUCTURED_OUTPUTS
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     )
 
     try:
+        # Pass through response_format when structured outputs are enabled and provided
         completion = client.chat.completions.create(
             extra_headers={
                 "HTTP-Referer": "http://localhost",
@@ -47,6 +48,7 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             messages=payload.get("messages", []),
             max_tokens=payload.get("max_tokens", 3000),
             temperature=payload.get("temperature", 0.2),
+            response_format=(payload.get("response_format") if USE_STRUCTURED_OUTPUTS and payload.get("response_format") else None),
             timeout=LLM_TIMEOUT_SECONDS,
         )
         
@@ -93,11 +95,12 @@ def validate_and_parse_response(result: Dict[str, Any], required_keys: list, pla
         logger.error(f"LLM Raw Content: {result['content']}")
         return None
 
-def create_payload(prompt: str, max_tokens: int = 3000, temperature: float = 0.2) -> Dict[str, Any]:
+def create_payload(prompt: str, max_tokens: int = 3000, temperature: float = 0.2, response_format: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create standard payload for LLM requests."""
     return {
         "model": LLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
-        "temperature": temperature
+        "temperature": temperature,
+        "response_format": response_format,
     }
