@@ -16,56 +16,41 @@ from ...database.supabase_client import store_plant_and_care_instructions, store
 
 logger = logging.getLogger(__name__)
 
-def call_openrouter_llm_indoor(plant_name: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get indoor plant care instructions as JSON."""
-    prompt = HOUSEPLANTS_PROMPT.format(plant_name=plant_name)
+HUMAN_FRIENDLY_GROUP = {
+    "houseplants": "houseplant",
+    "edible_annuals": "edible annual",
+    "fruit_trees": "fruit tree",
+    "ornamental_perennials": "ornamental perennial",
+    "annual_flowers": "annual flower",
+    "bulbs": "bulb",
+    "succulents": "succulent",
+}
+
+def call_openrouter_llm_dispatch(group_key: str, plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
+    """Dispatch to the correct prompt and call LLM in a DRY way."""
+    if group_key == "houseplants":
+        prompt = HOUSEPLANTS_PROMPT.format(plant_name=plant_name)
+    elif group_key == "edible_annuals":
+        prompt = EDIBLE_PLANTS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
+    elif group_key == "fruit_trees":
+        prompt = FRUIT_TREES_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
+    elif group_key == "ornamental_perennials":
+        prompt = ORNAMENTAL_PERENNIALS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
+    elif group_key == "annual_flowers":
+        prompt = ANNUAL_FLOWERS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
+    elif group_key == "bulbs":
+        prompt = BULBS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
+    elif group_key == "succulents":
+        prompt = SUCCULENTS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
+    else:
+        logger.error(f"Unknown prompt group: {group_key}")
+        return None
+
     payload = create_payload(prompt)
     result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'houseplant', plant_name)
+    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
 
-def call_openrouter_llm_edible_annuals(plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get edible annual care instructions as JSON."""
-    prompt = EDIBLE_PLANTS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'edible annual', plant_name)
-
-def call_openrouter_llm_fruit_trees(plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get fruit tree care instructions as JSON."""
-    prompt = FRUIT_TREES_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'fruit tree', plant_name)
-
-def call_openrouter_llm_ornamental_perennials(plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get ornamental perennial care instructions as JSON."""
-    prompt = ORNAMENTAL_PERENNIALS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'ornamental perennial', plant_name)
-
-def call_openrouter_llm_annual_flowers(plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get annual flower care instructions as JSON."""
-    prompt = ANNUAL_FLOWERS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'annual flower', plant_name)
-
-def call_openrouter_llm_bulbs(plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get bulb care instructions as JSON."""
-    prompt = BULBS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'bulb', plant_name)
-
-def call_openrouter_llm_succulents(plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Calls the OpenRouter API to get succulent care instructions as JSON."""
-    prompt = SUCCULENTS_PROMPT.format(plant_name=plant_name, user_zone=user_zone, plant_group=plant_group)
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'care_plan', 'requirements'], 'succulent', plant_name)
-
-def generate_plant_care_instructions(plant_name: str, user_zone: str) -> Optional[Dict[str, Any]]:
+def generate_plant_care_instructions(plant_name: str, user_zone: str, perform_image_handling: bool = True) -> Optional[Dict[str, Any]]:
     """
     Generate complete plant care instructions for a given plant and zone.
     
@@ -86,28 +71,9 @@ def generate_plant_care_instructions(plant_name: str, user_zone: str) -> Optiona
     prompt_function = classification_result["prompt_function"]
     
     # Step 2: Call appropriate LLM function based on classification
-    care_info = None
-    
-    if prompt_function == "houseplants":
-        care_info = call_openrouter_llm_indoor(plant_name)
-    elif prompt_function == "edible_annuals":
-        care_info = call_openrouter_llm_edible_annuals(plant_name, user_zone, plant_group)
-    elif prompt_function == "fruit_trees":
-        care_info = call_openrouter_llm_fruit_trees(plant_name, user_zone, plant_group)
-    elif prompt_function == "ornamental_perennials":
-        care_info = call_openrouter_llm_ornamental_perennials(plant_name, user_zone, plant_group)
-    elif prompt_function == "annual_flowers":
-        care_info = call_openrouter_llm_annual_flowers(plant_name, user_zone, plant_group)
-    elif prompt_function == "bulbs":
-        care_info = call_openrouter_llm_bulbs(plant_name, user_zone, plant_group)
-    elif prompt_function == "succulents":
-        care_info = call_openrouter_llm_succulents(plant_name, user_zone, plant_group)
-    else:
-        logger.error(f"Unknown prompt function: {prompt_function}")
-        return None
-
+    care_info = call_openrouter_llm_dispatch(prompt_function, plant_name, user_zone, plant_group)
     if care_info is None:
-        logger.error(f"Failed to generate care instructions for '{plant_name}'")
+        logger.error(f"Failed to generate care instructions for '{plant_name}' using group '{prompt_function}'")
         return None
 
     # Step 3: Store results in database
@@ -124,16 +90,29 @@ def generate_plant_care_instructions(plant_name: str, user_zone: str) -> Optiona
         # Still return the care_info even if storage fails
         # The API can decide whether to raise an error or not
     
-    # Step 4: Fetch and store image (optional, doesn't affect main functionality)
-    try:
-        corrected_plant_name = care_info.get('plantName', plant_name)
-        image_data = get_unsplash_image(corrected_plant_name)
-        if image_data:
-            store_plant_image(corrected_plant_name, image_data)
-        else:
-            logger.info(f"No image data found for '{corrected_plant_name}', skipping image storage.")
-    except Exception as e:
-        logger.error(f"Error during image handling for '{plant_name}': {e}")
-        # Don't let image errors affect the main result
+    # Step 4: Optionally fetch and store image (can be moved to background)
+    if perform_image_handling:
+        try:
+            corrected_plant_name = care_info.get('plantName', plant_name)
+            image_data = get_unsplash_image(corrected_plant_name)
+            if image_data:
+                store_plant_image(corrected_plant_name, image_data)
+            else:
+                logger.info(f"No image data found for '{corrected_plant_name}', skipping image storage.")
+        except Exception as e:
+            logger.error(f"Error during image handling for '{plant_name}': {e}")
+            # Don't let image errors affect the main result
     
     return care_info
+
+
+def fetch_and_store_image_for_plant(plant_name: str) -> None:
+    """Background-friendly helper to fetch Unsplash image data and store it."""
+    try:
+        image_data = get_unsplash_image(plant_name)
+        if image_data:
+            store_plant_image(plant_name, image_data)
+        else:
+            logger.info(f"No image data found for '{plant_name}', skipping image storage.")
+    except Exception as e:
+        logger.error(f"Background image handling error for '{plant_name}': {e}")

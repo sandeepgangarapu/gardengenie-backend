@@ -2,10 +2,17 @@ import requests
 import logging
 from typing import Optional, Dict
 
-from ..config import UNSPLASH_ACCESS_KEY, UNSPLASH_API_URL
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from ..config import UNSPLASH_ACCESS_KEY, UNSPLASH_API_URL, UNSPLASH_TIMEOUT_SECONDS, UNSPLASH_MAX_RETRIES
 
 logger = logging.getLogger(__name__)
 
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(UNSPLASH_MAX_RETRIES),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=4),
+    retry=retry_if_exception_type(requests.exceptions.RequestException),
+)
 def get_unsplash_image(plant_name: str) -> Optional[dict]:
     """Queries the Unsplash API for an image of the given plant name."""
     if not UNSPLASH_ACCESS_KEY:
@@ -23,7 +30,7 @@ def get_unsplash_image(plant_name: str) -> Optional[dict]:
     }
 
     try:
-        response = requests.get(UNSPLASH_API_URL, headers=headers, params=params, timeout=15)
+        response = requests.get(UNSPLASH_API_URL, headers=headers, params=params, timeout=UNSPLASH_TIMEOUT_SECONDS)
         response.raise_for_status()
         data = response.json()
 

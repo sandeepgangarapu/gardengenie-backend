@@ -1,11 +1,12 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS
-from .models import PlantCareInput, PlantIdentificationResponse
-from .services.plant_care.plant_care import generate_plant_care_instructions
+from .models import PlantCareInput, PlantIdentificationResponse, PlantCareResponse
+from .services.plant_care.plant_care import generate_plant_care_instructions, fetch_and_store_image_for_plant
 from .services.plant_identification.plant_identification import identify_plant_from_uploaded_image, validate_image_data
 from .database.supabase_client import health_check, get_supabase_client
 
@@ -22,15 +23,16 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,  # set True only if you need cookies/session
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    max_age=86400,
 )
 
 # --- API Endpoints ---
 
-@app.post("/plant-care-instructions", response_model=dict)
-async def get_plant_care_instructions(payload: PlantCareInput, request: Request):
+@app.post("/plant-care-instructions", response_model=PlantCareResponse)
+async def get_plant_care_instructions(payload: PlantCareInput, request: Request, background_tasks: BackgroundTasks):
     """
     Receives a plant name and USDA zone, classifies the plant care category,
     generates appropriate care instructions using an LLM, stores the result
@@ -44,13 +46,23 @@ async def get_plant_care_instructions(payload: PlantCareInput, request: Request)
     user_zone = payload.user_zone
     logger.info(f"Received request for plant care: '{plant_name}' in zone '{user_zone}'")
 
-    # Generate plant care instructions using the service
-    care_info = generate_plant_care_instructions(plant_name, user_zone)
+    # Generate plant care instructions using the service (offload to threadpool)
+    care_info = await run_in_threadpool(
+        generate_plant_care_instructions,
+        plant_name,
+        user_zone,
+        False  # skip image handling in-request
+    )
     
     if care_info is None:
         raise HTTPException(status_code=503, detail="Error generating plant care instructions.")
 
     logger.info(f"Successfully generated care instructions for '{plant_name}'")
+
+    # Kick off background image fetch/store using possibly corrected name
+    corrected_plant_name = care_info.get('plantName', plant_name)
+    background_tasks.add_task(fetch_and_store_image_for_plant, corrected_plant_name)
+
     return care_info
 
 @app.post("/identify-plant", response_model=PlantIdentificationResponse)

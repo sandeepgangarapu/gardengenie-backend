@@ -2,7 +2,6 @@ import logging
 import datetime
 from typing import Optional, Dict, Any, List
 from supabase import create_client, Client
-from supabase.lib.client_options import ClientOptions
 from postgrest import APIResponse, APIError
 
 from ..config import SUPABASE_URL, SUPABASE_KEY
@@ -21,9 +20,8 @@ def initialize_supabase() -> Optional[Client]:
         return None
     
     try:
-        # Use ClientOptions for potential future configurations (e.g., schema)
-        options: ClientOptions = ClientOptions()
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options)
+        # Initialize without ClientOptions for broader version compatibility
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         logger.info("Supabase client initialized successfully.")
         return supabase
     except Exception as e:
@@ -233,18 +231,166 @@ def store_plant_and_care_instructions(
 
     plant_uuid: Optional[str] = None
 
+    # Prepare plant payload used by both RPC and legacy paths
+    plant_data_for_upsert = {
+        'plant_name': plant_name,
+        'zone': zone,
+        'description': description,
+        'type': plant_type,
+        'sun_requirements': sun_requirements,
+        'seed_starting_month': seed_start_month,
+        'planting_month': plant_month,
+        'seed_starting_instructions': seed_instructions,
+        'planting_instructions': plant_instructions,
+        'zone_suitability': zone_suitability,
+        'seasonality': seasonality,
+        'plant_group': final_plant_group,
+        # New JSONB fields
+        'requirements': requirements_json,
+        'type_specific': type_specific_json,
+        'seed_starting': seed_starting_json,
+        'planting': planting_json,
+        'care_plan': care_plan_json,
+        # Model used for generation
+        'model_used': model_used,
+        # Full raw LLM response for traceability
+        'raw_llm_response': raw_llm_response_json,
+    }
+
+    # First, attempt transactional write via RPC. We construct the care rows
+    # without plant_id so the DB function can attach the UUID atomically.
+    def build_care_rows_without_plant_id() -> List[Dict[str, Any]]:
+        care_rows: List[Dict[str, Any]] = []
+
+        def map_phase_from_tab(style: str, tab_key: str, tab_label: str, group: Optional[str]) -> str:
+            normalized_key = (tab_key or '').strip().lower()
+            normalized_label = (tab_label or '').strip().lower()
+            style_normalized = (style or '').strip().lower()
+
+            if style_normalized == 'seasons':
+                for candidate in (normalized_key, normalized_label):
+                    if candidate in {'spring', 'summer', 'fall', 'winter'}:
+                        return candidate
+                return 'seasonal_maintenance'
+
+            if style_normalized == 'indoor':
+                if normalized_key == 'year_round' or normalized_label == 'year‑round' or normalized_label == 'year-round':
+                    return 'seasonal_maintenance'
+                if normalized_key in {'summer', 'winter'}:
+                    return normalized_key
+                return 'seasonal_maintenance'
+
+            # lifecycle and unknown styles
+            if normalized_key in {'grow', 'growing'}:
+                return 'growing_season'
+            if normalized_key in {'grow_bloom', 'bloom', 'blooming'}:
+                return 'blooming_season'
+            if normalized_key in {'harvest'}:
+                return 'harvest'
+            if normalized_key in {'end', 'end_of_season'}:
+                return 'end_of_season'
+            if normalized_key in {'post_bloom', 'post‑bloom', 'post-bloom'}:
+                return 'seasonal_maintenance'
+            if normalized_key in {'dormancy', 'dormant'}:
+                return 'seasonal_maintenance'
+            if normalized_key in {'repot', 'repot_propagate', 'repot/propagate'}:
+                return 'maintenance'
+            # Fallbacks using label
+            if normalized_label in {'spring', 'summer', 'fall', 'winter'}:
+                return normalized_label
+            return 'seasonal_maintenance'
+
+        if care_plan_json and isinstance(care_plan_json, dict):
+            style = care_plan_json.get('style')
+            tabs = care_plan_json.get('tabs') or []
+            if isinstance(tabs, list):
+                for tab in tabs:
+                    if not isinstance(tab, dict):
+                        continue
+                    care_phase = map_phase_from_tab(style, tab.get('key'), tab.get('label'), final_plant_group)
+                    items = tab.get('items') or []
+                    if not isinstance(items, list):
+                        continue
+                    for i, item in enumerate(items):
+                        if not isinstance(item, dict):
+                            continue
+                        text_value = item.get('text')
+                        if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                            continue
+                        instruction_row = {
+                            'care_phase': care_phase,
+                            'months': item.get('when'),
+                            'step_description': text_value.strip(),
+                            'priority': item.get('priority'),
+                            'order_within_season': i + 1,
+                        }
+                        care_rows.append(instruction_row)
+        else:
+            # Legacy care path
+            for care_phase, steps in care_details.items():
+                if not isinstance(steps, list):
+                    continue
+                for i, step_detail in enumerate(steps):
+                    if not isinstance(step_detail, dict):
+                        continue
+                    step_description = step_detail.get('step')
+                    if not step_description or not isinstance(step_description, str) or not step_description.strip():
+                        continue
+                    instruction_row = {
+                        'care_phase': care_phase,
+                        'months': step_detail.get('months'),
+                        'step_description': step_description.strip(),
+                        'priority': step_detail.get('priority'),
+                        'order_within_season': i + 1,
+                    }
+                    care_rows.append(instruction_row)
+
+        return care_rows
+
+    care_rows_for_rpc: List[Dict[str, Any]] = build_care_rows_without_plant_id()
+
+    # Only attempt RPC if we have at least one row or explicitly no rows
+    # (RPC handles delete-only cases too)
     try:
-        # Find or Insert/Update Plant Record
+        if client is not None:
+            rpc_params = {
+                'plant': plant_data_for_upsert,
+                'care_instructions': care_rows_for_rpc,
+                'lookup': {
+                    'plant_name': plant_name,
+                    'zone': zone,
+                    'plant_group': final_plant_group,
+                }
+            }
+            rpc_response: APIResponse = client.rpc('upsert_plant_and_care', rpc_params).execute()
+            if rpc_response is not None and getattr(rpc_response, 'data', None):
+                # Expecting JSON with at least plant_id
+                returned = rpc_response.data
+                if isinstance(returned, dict) and returned.get('plant_id'):
+                    logger.info("Stored plant and care via RPC transaction.")
+                    return True
+                # Some PostgREST versions wrap in list
+                if isinstance(returned, list) and len(returned) > 0 and isinstance(returned[0], dict) and returned[0].get('plant_id'):
+                    logger.info("Stored plant and care via RPC transaction.")
+                    return True
+            logger.warning(f"RPC upsert_plant_and_care did not return expected data: {rpc_response!r}. Falling back to client-side operations.")
+    except APIError as api_e:
+        logger.error(f"RPC upsert_plant_and_care API error: {api_e.message}. Falling back to client-side operations.")
+    except Exception as e:
+        logger.error(f"RPC upsert_plant_and_care exception: {e}. Falling back to client-side operations.")
+
+    try:
+        # Find or Insert/Update Plant Record (legacy multi-step path)
         logger.debug(f"Checking for plant: {plant_name}, zone: {zone}, plant_group: {final_plant_group}")
         
         # Use different query logic for houseplants vs outdoor plants based on plant group
         if final_plant_group in ['Houseplants', 'Succulents']:
-            # For houseplants/succulents, search by name and plant group (zone should be null)
+            # For houseplants/succulents, search by name and plant group (zone should be NULL)
             response: APIResponse = client.table('plants')\
                                         .select('plant_id')\
                                         .eq('plant_name', plant_name)\
                                         .eq('plant_group', final_plant_group)\
-                                        .is_('zone', 'null')\
+                                        .is_('zone', None)\
                                         .execute()
         else:
             # For outdoor plants, search by name and zone
@@ -261,30 +407,7 @@ def store_plant_and_care_instructions(
             logger.error("Supabase query execution (find plant) returned None. Check connection/client state/API logs (maybe 406?).")
             return False
 
-        plant_data_for_upsert = {
-            'plant_name': plant_name,
-            'zone': zone,
-            'description': description,
-            'type': plant_type,
-            'sun_requirements': sun_requirements,
-            'seed_starting_month': seed_start_month,
-            'planting_month': plant_month,
-            'seed_starting_instructions': seed_instructions,
-            'planting_instructions': plant_instructions,
-            'zone_suitability': zone_suitability,
-            'seasonality': seasonality,
-            'plant_group': final_plant_group,
-            # New JSONB fields
-            'requirements': requirements_json,
-            'type_specific': type_specific_json,
-            'seed_starting': seed_starting_json,
-            'planting': planting_json,
-            'care_plan': care_plan_json,
-            # Model used for generation
-            'model_used': model_used,
-            # Full raw LLM response for traceability
-            'raw_llm_response': raw_llm_response_json,
-        }
+        # plant_data_for_upsert already constructed above
 
         if response.data and len(response.data) > 0:
             # Plant(s) exist

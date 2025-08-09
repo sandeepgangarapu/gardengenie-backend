@@ -17,19 +17,28 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 LLM_MODEL = "google/gemini-2.5-flash"
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
 
 # --- Unsplash Configuration ---
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 UNSPLASH_API_URL = "https://api.unsplash.com/search/photos"
+UNSPLASH_TIMEOUT_SECONDS = int(os.getenv("UNSPLASH_TIMEOUT_SECONDS", "7"))
+UNSPLASH_MAX_RETRIES = int(os.getenv("UNSPLASH_MAX_RETRIES", "3"))
 
 # --- CORS Configuration ---
-CORS_ORIGINS = [
-    "https://gardengenie.lovable.app",  # Your frontend origin
-    "http://localhost",  # Allow local development if needed
-    "http://localhost:8000",  # Allow local development if needed (common port)
-    "http://localhost:3000",  # Common frontend dev port
-    # Add any other origins you need to allow
-]
+APP_ENV = os.getenv("APP_ENV", "development").lower()
+
+if APP_ENV == "production":
+    CORS_ORIGINS = [
+        "https://gardengenie.lovable.app",
+    ]
+else:
+    CORS_ORIGINS = [
+        "http://localhost",
+        "http://localhost:8000",
+        "http://localhost:3000",
+    ]
 
 # --- App Configuration ---
 APP_TITLE = "Plant Care API"

@@ -4,7 +4,8 @@ import logging
 import re
 from typing import Optional, Dict, Any
 
-from ..config import OPENROUTER_API_KEY, LLM_MODEL
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from ..config import OPENROUTER_API_KEY, LLM_MODEL, LLM_TIMEOUT_SECONDS, LLM_MAX_RETRIES
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,12 @@ def extract_json_from_response(content: str) -> str:
     else:
         return content.strip()
 
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(LLM_MAX_RETRIES),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=8),
+    retry=retry_if_exception_type(Exception),
+)
 def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Helper function to make requests to OpenRouter API using OpenAI client."""
     if not OPENROUTER_API_KEY:
@@ -39,7 +46,8 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             model=payload.get("model", LLM_MODEL),
             messages=payload.get("messages", []),
             max_tokens=payload.get("max_tokens", 3000),
-            temperature=payload.get("temperature", 0.2)
+            temperature=payload.get("temperature", 0.2),
+            timeout=LLM_TIMEOUT_SECONDS,
         )
         
         raw_content = completion.choices[0].message.content.strip()
@@ -54,7 +62,7 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     
     except Exception as e:
         logger.error(f"Error calling OpenRouter API: {e}")
-        return None
+        raise
 
 def validate_and_parse_response(result: Dict[str, Any], required_keys: list, plant_type: str, plant_name: str) -> Optional[Dict[str, Any]]:
     """Common validation logic for LLM responses."""
