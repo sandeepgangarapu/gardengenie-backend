@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Dict, Any
 
 from ..llm_base import make_llm_request, create_payload
+from ...config import VISION_LLM_MODEL
 from .plant_identification_prompt import PLANT_IDENTIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -47,8 +48,28 @@ def identify_plant_from_image(image_data: bytes) -> Optional[Dict[str, Any]]:
 
     prompt = PLANT_IDENTIFICATION_PROMPT
 
+    # Structured output schema for identification
+    identification_schema = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "PlantIdentification",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "is_plant": {"type": "boolean"},
+                    "message": {"type": "string"},
+                    "common_name": {"type": ["string", "null"]},
+                    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+                },
+                "required": ["is_plant", "message", "common_name", "confidence"]
+            }
+        }
+    }
+
     payload = {
-        "model": create_payload("", max_tokens=300, temperature=0.2)["model"],
+        "model": VISION_LLM_MODEL or create_payload("", max_tokens=300, temperature=0.2)["model"],
         "messages": [
             {
                 "role": "user", 
@@ -64,7 +85,8 @@ def identify_plant_from_image(image_data: bytes) -> Optional[Dict[str, Any]]:
             }
         ],
         "max_tokens": 300,
-        "temperature": 0.2
+        "temperature": 0.2,
+        "response_format": identification_schema,
     }
 
     result = make_llm_request(payload)

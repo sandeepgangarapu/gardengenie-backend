@@ -39,6 +39,7 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     try:
         # Pass through response_format when structured outputs are enabled and provided
+        response_format = payload.get("response_format") if USE_STRUCTURED_OUTPUTS else None
         completion = client.chat.completions.create(
             extra_headers={
                 "HTTP-Referer": "http://localhost",
@@ -48,11 +49,20 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             messages=payload.get("messages", []),
             max_tokens=payload.get("max_tokens", 3000),
             temperature=payload.get("temperature", 0.2),
-            response_format=(payload.get("response_format") if USE_STRUCTURED_OUTPUTS and payload.get("response_format") else None),
+            response_format=(response_format if response_format else None),
             timeout=LLM_TIMEOUT_SECONDS,
         )
         
-        raw_content = completion.choices[0].message.content.strip()
+        # Prefer message.content; some providers place structured JSON in `message.reasoning`
+        msg = completion.choices[0].message
+        raw_content = (msg.content or "").strip()
+        if not raw_content:
+            try:
+                alt = getattr(msg, "reasoning", None)
+                if isinstance(alt, str) and alt.strip():
+                    raw_content = alt.strip()
+            except Exception:
+                pass
         # Extract JSON from markdown blocks if present
         clean_content = extract_json_from_response(raw_content)
         if not clean_content:

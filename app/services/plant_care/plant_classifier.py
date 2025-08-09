@@ -29,7 +29,39 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
     """
     prompt = PLANT_CLASSIFICATION_PROMPT.format(plant_name=plant_name)
 
-    payload = create_payload(prompt, max_tokens=100, temperature=0.1)
+    # Structured output schema for classification
+    classification_schema = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "PlantGroupClassification",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "plant_group": {
+                        "type": "string",
+                        "enum": [
+                            "Vegetables",
+                            "Herbs",
+                            "Fruit Trees",
+                            "Flowering Shrubs",
+                            "Perennial Flowers",
+                            "Annual Flowers",
+                            "Ornamental Trees",
+                            "Houseplants",
+                            "Succulents",
+                            "Bulbs",
+                            "Native Plants",
+                        ],
+                    }
+                },
+                "required": ["plant_group"],
+            },
+        },
+    }
+
+    payload = create_payload(prompt, max_tokens=100, temperature=0.1, response_format=classification_schema)
     result = make_llm_request(payload)
     
     if not result:

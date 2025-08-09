@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 30
     llm_max_retries: int = 3
     llm_use_structured_outputs: bool = True
+    # Vision
+    vision_llm_model: str = "google/gemini-2.5-flash"
 
     # Unsplash
     unsplash_access_key: str | None = None
@@ -99,6 +101,7 @@ LLM_MODEL = settings.llm_model
 LLM_TIMEOUT_SECONDS = settings.llm_timeout_seconds
 LLM_MAX_RETRIES = settings.llm_max_retries
 USE_STRUCTURED_OUTPUTS = settings.llm_use_structured_outputs
+VISION_LLM_MODEL = settings.vision_llm_model
 
 UNSPLASH_ACCESS_KEY = settings.unsplash_access_key
 UNSPLASH_API_URL = settings.unsplash_api_url
