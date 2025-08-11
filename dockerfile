@@ -20,12 +20,12 @@ COPY . .
 
 # Render dynamically assigns a port via the PORT environment variable.
 # Default to 8080 if PORT is not set (useful for local testing).
-ENV PORT ${PORT:-8080}
+ENV PORT=8080
 
-# Expose the port the app runs on (dynamically set by Render)
-EXPOSE $PORT
+# Expose a fixed port; environments like Render will map their PORT to this
+EXPOSE 8080
 
 # Command to run the application using Uvicorn.
 # It will listen on the port specified by the PORT environment variable.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
 
