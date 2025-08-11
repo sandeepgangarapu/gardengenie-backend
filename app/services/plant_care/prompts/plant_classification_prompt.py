@@ -3,11 +3,11 @@ Determine whether the input "{plant_name}" refers to a plant. If it is a plant, 
 
 Respond with ONLY a JSON object in this exact format:
 
-{
+{{
   "is_plant": true/false,
   "plant_group": "Vegetables" | "Herbs" | "Fruit Trees" | "Flowering Shrubs" | "Perennial Flowers" | "Annual Flowers" | "Ornamental Trees" | "Houseplants" | "Succulents" | "Bulbs" | "Native Plants" | null,
   "message": "If not a plant, a brief reason; if a plant, you may return a short confirmation"
-}
+}}
 
 Guidelines:
 - Set "is_plant" to true only if the input clearly refers to a living plant (houseplant, tree, shrub, flower, vegetable, herb, succulent, bulb, etc.).
