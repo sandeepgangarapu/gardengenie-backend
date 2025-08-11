@@ -74,7 +74,7 @@ def generate_plant_care_instructions(
         return None
     # If the input is not a plant, short-circuit with a sentinel
     if not classification_result.get('is_plant', True):
-        return {"__non_plant": True, "message": classification_result.get('message', 'Input does not appear to be a plant.')}
+        return {"__non_plant": True, "message": classification_result.get('message', 'Not a plant.')}
     
     plant_group = classification_result["plant_group"]
     prompt_function = classification_result["prompt_function"]

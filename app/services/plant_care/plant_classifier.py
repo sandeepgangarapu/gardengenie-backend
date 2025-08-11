@@ -57,25 +57,36 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
                             None,
                         ],
                     },
-                    "message": {"type": ["string", "null"]},
                 },
                 "required": ["is_plant", "plant_group"],
             },
         },
     }
 
-    payload = create_payload(prompt, max_tokens=100, temperature=0.1, response_format=classification_schema)
-    result = make_llm_request(payload)
+    payload = create_payload(prompt, max_tokens=128, temperature=0.0, response_format=classification_schema)
     
-    if not result:
-        return None
+    # Try up to 3 attempts to mitigate occasional truncation
+    for attempt in range(1, 4):
+        result = make_llm_request(payload)
+        if not result:
+            continue
 
-    try:
-        classification = json.loads(result["content"])
+        content = result.get("content", "") or ""
+        # If content appears truncated, retry
+        if not content.rstrip().endswith('}'):
+            logger.warning(f"Attempt {attempt}: classification JSON appears truncated. Retrying...")
+            continue
+
+        try:
+            classification = json.loads(content)
+        except json.JSONDecodeError as json_e:
+            logger.warning(f"Attempt {attempt}: failed to decode classification JSON: {json_e}. Retrying...")
+            continue
+
         # Basic shape validation
         if "is_plant" not in classification or "plant_group" not in classification:
-            logger.error(f"LLM JSON missing required fields for plant group classification: {classification}")
-            return None
+            logger.warning(f"Attempt {attempt}: LLM JSON missing required fields: {classification}. Retrying...")
+            continue
 
         is_plant = bool(classification.get("is_plant"))
         plant_group = classification.get("plant_group")
@@ -88,23 +99,21 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
         if not is_plant:
             # For non-plant, expect plant_group to be None/null
             if plant_group is not None:
-                logger.error(f"Non-plant input must have plant_group=null. Got: {classification}")
-                return None
-            logger.info(f"Input '{plant_name}' determined to be non-plant: {classification.get('message')}")
-            return {"is_plant": False, "message": classification.get("message")}
+                logger.warning(f"Attempt {attempt}: Non-plant must have plant_group=null. Got: {classification}. Retrying...")
+                continue
+            logger.info(f"Input '{plant_name}' determined to be non-plant.")
+            return {"is_plant": False}
 
         # is_plant is True: validate group
         if plant_group not in valid_plant_groups:
-            logger.error(f"Invalid classification values: {classification}")
-            return None
+            logger.warning(f"Attempt {attempt}: Invalid plant_group '{plant_group}'. Retrying...")
+            continue
 
         logger.info(f"Plant '{plant_name}' classified as: {classification}")
         return {"is_plant": True, "plant_group": plant_group}
-        
-    except json.JSONDecodeError as json_e:
-        logger.error(f"Failed to decode JSON response from LLM for plant care classification: {json_e}")
-        logger.error(f"LLM Raw Content: {result['content']}")
-        return None
+
+    logger.error(f"Could not classify plant group for '{plant_name}' after retries")
+    return None
 
 def get_plant_group_and_prompt(plant_name: str) -> Optional[Dict[str, str]]:
     """
@@ -122,7 +131,7 @@ def get_plant_group_and_prompt(plant_name: str) -> Optional[Dict[str, str]]:
 
     # If not a plant, bubble up this information
     if not plant_classification.get("is_plant", True):
-        return {"is_plant": False, "message": plant_classification.get("message")}
+        return {"is_plant": False}
 
     plant_group = plant_classification["plant_group"]
     

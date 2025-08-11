@@ -53,18 +53,29 @@ def make_llm_request(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             timeout=LLM_TIMEOUT_SECONDS,
         )
         
-        # Prefer message.content; some providers place structured JSON in `message.reasoning`
+        # Prefer structured parsed output when available (for response_format schemas)
         msg = completion.choices[0].message
-        raw_content = (msg.content or "").strip()
-        if not raw_content:
-            try:
-                alt = getattr(msg, "reasoning", None)
-                if isinstance(alt, str) and alt.strip():
-                    raw_content = alt.strip()
-            except Exception:
-                pass
-        # Extract JSON from markdown blocks if present
-        clean_content = extract_json_from_response(raw_content)
+        try:
+            parsed_obj = getattr(msg, "parsed", None)
+        except Exception:
+            parsed_obj = None
+
+        if parsed_obj is not None:
+            # Use the parsed object directly to avoid truncation issues in message.content
+            clean_content = json.dumps(parsed_obj, ensure_ascii=False)
+            raw_content = clean_content
+        else:
+            # Prefer message.content; some providers place structured JSON in `message.reasoning`
+            raw_content = (msg.content or "").strip()
+            if not raw_content:
+                try:
+                    alt = getattr(msg, "reasoning", None)
+                    if isinstance(alt, str) and alt.strip():
+                        raw_content = alt.strip()
+                except Exception:
+                    pass
+            # Extract JSON from markdown blocks if present
+            clean_content = extract_json_from_response(raw_content)
         if not clean_content:
             logger.warning("Received empty content from LLM.")
             return None

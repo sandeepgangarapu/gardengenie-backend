@@ -5,13 +5,12 @@ Respond with ONLY a JSON object in this exact format:
 
 {{
   "is_plant": true/false,
-  "plant_group": "Vegetables" | "Herbs" | "Fruit Trees" | "Flowering Shrubs" | "Perennial Flowers" | "Annual Flowers" | "Ornamental Trees" | "Houseplants" | "Succulents" | "Bulbs" | "Native Plants" | null,
-  "message": "If not a plant, a brief reason; if a plant, you may return a short confirmation"
+  "plant_group": "Vegetables" | "Herbs" | "Fruit Trees" | "Flowering Shrubs" | "Perennial Flowers" | "Annual Flowers" | "Ornamental Trees" | "Houseplants" | "Succulents" | "Bulbs" | "Native Plants" | null
 }}
 
 Guidelines:
 - Set "is_plant" to true only if the input clearly refers to a living plant (houseplant, tree, shrub, flower, vegetable, herb, succulent, bulb, etc.).
-- If "is_plant" is false, set "plant_group" to null and provide a brief helpful message explaining why (e.g., "This appears to be an appliance, not a plant.").
+- If "is_plant" is false, set "plant_group" to null.
 - If "is_plant" is true, set "plant_group" to one of the following:
   - "Vegetables": Annual edible plants grown for food (tomatoes, lettuce, peppers, carrots, etc.)
   - "Herbs": Annual and perennial plants grown for culinary or medicinal use (basil, rosemary, mint, etc.)
