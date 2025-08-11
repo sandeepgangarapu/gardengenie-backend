@@ -51,7 +51,6 @@ class PlantCareResponse(BaseModel):
 
     # LLM-structured fields
     requirements: Optional[Dict[str, Any]] = None
-    typeSpecific: Optional[Dict[str, Any]] = None
     seed_starting: Optional[Union[Dict[str, Any], List[Any]]] = None
     planting: Optional[Union[Dict[str, Any], List[Any]]] = None
     care_plan: Optional[CarePlan] = None

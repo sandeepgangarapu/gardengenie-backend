@@ -17,16 +17,14 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
   "zoneSuitability": "[match OR close OR far]",
   "seedStartingMonth": null,
   "plantingMonth": "[Month(s) or range for outdoor/container planting; e.g., Apr–May after frost or anytime indoors]",
-  "typeSpecific": {{
-    "hardiness": "[Hardy to Zone X OR Tender, container only OR Cold-sensitive]"
-  }},
   "requirements": {{
     "sun": "[Full Sun OR Bright Light OR Partial Shade]",
     "water": "[Soak and dry method OR Minimal winter water OR Deep, infrequent]",
     "soil": "[Cactus/succulent mix OR Sandy, well-draining OR Fast-draining]",
     "drainage": "[Excellent drainage critical OR Good drainage OR Tolerates brief moisture]",
     "temperature": "[Cold hardy to XF OR Minimum 50F OR Heat tolerant]",
-    "humidity": "[Low humidity preferred OR Tolerates humidity OR Avoid high humidity]"
+    "humidity": "[Low humidity preferred OR Tolerates humidity OR Avoid high humidity]",
+    "hardiness": "[Hardy to Zone X OR Tender, container only OR Cold-sensitive]"
   }},
   "seed_starting": [],
   "planting": [
@@ -65,6 +63,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact phrases). No sentences.
 1. Address outdoor vs. container growing based on local hardiness conditions. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Provide specific winter protection needs for this climate
 3. Use lifecycle tabs (Grow, Dormancy, Repot/Propagate). Keep 1–3 concise items per tab (max 8 total)

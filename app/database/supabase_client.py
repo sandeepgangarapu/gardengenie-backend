@@ -194,7 +194,11 @@ def store_plant_and_care_instructions(
     zone = original_user_zone  # Use the original zone passed from the user
     description = care_info.get('description')
     plant_type = care_info.get('type')
-    sun_requirements = care_info.get('sun')
+    requirements_json = care_info.get('requirements')
+    # Prefer top-level sun; fallback to requirements.sun if present
+    sun_requirements = care_info.get('sun') or (
+        (requirements_json.get('sun') if isinstance(requirements_json, dict) else None)
+    )
     seed_start_month = care_info.get('seedStartingMonth')
     plant_month = care_info.get('plantingMonth')
     seed_instructions = care_info.get('seedStartingInstructions') or []
@@ -206,8 +210,6 @@ def store_plant_and_care_instructions(
 
     # New structured fields to persist losslessly in JSONB columns
     requirements_json = care_info.get('requirements')
-    # Accept either camelCase 'typeSpecific' from prompt or snake_case fallback
-    type_specific_json = care_info.get('typeSpecific') or care_info.get('type_specific')
     seed_starting_json = care_info.get('seed_starting')
     planting_json = care_info.get('planting')
     care_plan_json = care_info.get('care_plan')
@@ -231,10 +233,15 @@ def store_plant_and_care_instructions(
 
     plant_uuid: Optional[str] = None
 
+    # Determine zone persistence policy:
+    # - Houseplants/Succulents: persist NULL zone
+    # - Others: persist the provided zone
+    zone_for_persistence = None if final_plant_group in ['Houseplants', 'Succulents'] else zone
+
     # Prepare plant payload used by both RPC and legacy paths
     plant_data_for_upsert = {
         'plant_name': plant_name,
-        'zone': zone,
+        'zone': zone_for_persistence,
         'description': description,
         'type': plant_type,
         'sun_requirements': sun_requirements,
@@ -247,7 +254,7 @@ def store_plant_and_care_instructions(
         'plant_group': final_plant_group,
         # New JSONB fields
         'requirements': requirements_json,
-        'type_specific': type_specific_json,
+        # type_specific removed; all values folded into requirements
         'seed_starting': seed_starting_json,
         'planting': planting_json,
         'care_plan': care_plan_json,
@@ -263,42 +270,12 @@ def store_plant_and_care_instructions(
         care_rows: List[Dict[str, Any]] = []
 
         def map_phase_from_tab(style: str, tab_key: str, tab_label: str, group: Optional[str]) -> str:
-            normalized_key = (tab_key or '').strip().lower()
-            normalized_label = (tab_label or '').strip().lower()
-            style_normalized = (style or '').strip().lower()
-
-            if style_normalized == 'seasons':
-                for candidate in (normalized_key, normalized_label):
-                    if candidate in {'spring', 'summer', 'fall', 'winter'}:
-                        return candidate
-                return 'seasonal_maintenance'
-
-            if style_normalized == 'indoor':
-                if normalized_key == 'year_round' or normalized_label == 'year‑round' or normalized_label == 'year-round':
-                    return 'seasonal_maintenance'
-                if normalized_key in {'summer', 'winter'}:
-                    return normalized_key
-                return 'seasonal_maintenance'
-
-            # lifecycle and unknown styles
-            if normalized_key in {'grow', 'growing'}:
-                return 'growing_season'
-            if normalized_key in {'grow_bloom', 'bloom', 'blooming'}:
-                return 'blooming_season'
-            if normalized_key in {'harvest'}:
-                return 'harvest'
-            if normalized_key in {'end', 'end_of_season'}:
-                return 'end_of_season'
-            if normalized_key in {'post_bloom', 'post‑bloom', 'post-bloom'}:
-                return 'seasonal_maintenance'
-            if normalized_key in {'dormancy', 'dormant'}:
-                return 'seasonal_maintenance'
-            if normalized_key in {'repot', 'repot_propagate', 'repot/propagate'}:
-                return 'maintenance'
-            # Fallbacks using label
-            if normalized_label in {'spring', 'summer', 'fall', 'winter'}:
-                return normalized_label
-            return 'seasonal_maintenance'
+            """Store the tab label directly as care_phase; fallback to key; then 'General'."""
+            label_original = (tab_label or '').strip()
+            if label_original:
+                return label_original
+            key_original = (tab_key or '').strip()
+            return key_original if key_original else 'General'
 
         if care_plan_json and isinstance(care_plan_json, dict):
             style = care_plan_json.get('style')
@@ -358,7 +335,8 @@ def store_plant_and_care_instructions(
                 'care_instructions': care_rows_for_rpc,
                 'lookup': {
                     'plant_name': plant_name,
-                    'zone': zone,
+                    # Pass the effective zone used for persistence and lookups
+                    'zone': zone_for_persistence,
                     'plant_group': final_plant_group,
                 }
             }
@@ -469,42 +447,12 @@ def store_plant_and_care_instructions(
         skipped_instructions = 0
 
         def map_phase_from_tab(style: str, tab_key: str, tab_label: str, group: Optional[str]) -> str:
-            normalized_key = (tab_key or '').strip().lower()
-            normalized_label = (tab_label or '').strip().lower()
-            style_normalized = (style or '').strip().lower()
-
-            if style_normalized == 'seasons':
-                for candidate in (normalized_key, normalized_label):
-                    if candidate in {'spring', 'summer', 'fall', 'winter'}:
-                        return candidate
-                return 'seasonal_maintenance'
-
-            if style_normalized == 'indoor':
-                if normalized_key == 'year_round' or normalized_label == 'year‑round' or normalized_label == 'year-round':
-                    return 'seasonal_maintenance'
-                if normalized_key in {'summer', 'winter'}:
-                    return normalized_key
-                return 'seasonal_maintenance'
-
-            # lifecycle and unknown styles
-            if normalized_key in {'grow', 'growing'}:
-                return 'growing_season'
-            if normalized_key in {'grow_bloom', 'bloom', 'blooming'}:
-                return 'blooming_season'
-            if normalized_key in {'harvest'}:
-                return 'harvest'
-            if normalized_key in {'end', 'end_of_season'}:
-                return 'end_of_season'
-            if normalized_key in {'post_bloom', 'post‑bloom', 'post-bloom'}:
-                return 'seasonal_maintenance'
-            if normalized_key in {'dormancy', 'dormant'}:
-                return 'seasonal_maintenance'
-            if normalized_key in {'repot', 'repot_propagate', 'repot/propagate'}:
-                return 'maintenance'
-            # Fallbacks using label
-            if normalized_label in {'spring', 'summer', 'fall', 'winter'}:
-                return normalized_label
-            return 'seasonal_maintenance'
+            """Store the tab label directly as care_phase; fallback to key; then 'General'."""
+            label_original = (tab_label or '').strip()
+            if label_original:
+                return label_original
+            key_original = (tab_key or '').strip()
+            return key_original if key_original else 'General'
 
         if care_plan_json and isinstance(care_plan_json, dict):
             style = care_plan_json.get('style')

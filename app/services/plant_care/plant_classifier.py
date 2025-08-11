@@ -29,7 +29,7 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
     """
     prompt = PLANT_CLASSIFICATION_PROMPT.format(plant_name=plant_name)
 
-    # Structured output schema for classification
+    # Structured output schema for classification with is_plant failsafe
     classification_schema = {
         "type": "json_schema",
         "json_schema": {
@@ -39,8 +39,9 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
+                    "is_plant": {"type": "boolean"},
                     "plant_group": {
-                        "type": "string",
+                        "type": ["string", "null"],
                         "enum": [
                             "Vegetables",
                             "Herbs",
@@ -53,10 +54,12 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
                             "Succulents",
                             "Bulbs",
                             "Native Plants",
+                            None,
                         ],
-                    }
+                    },
+                    "message": {"type": ["string", "null"]},
                 },
-                "required": ["plant_group"],
+                "required": ["is_plant", "plant_group"],
             },
         },
     }
@@ -69,21 +72,34 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
 
     try:
         classification = json.loads(result["content"])
-        # Validate required fields
-        required_fields = ['plant_group']
-        if not all(k in classification for k in required_fields):
+        # Basic shape validation
+        if "is_plant" not in classification or "plant_group" not in classification:
             logger.error(f"LLM JSON missing required fields for plant group classification: {classification}")
             return None
-        
-        # Validate values
-        valid_plant_groups = ['Vegetables', 'Herbs', 'Fruit Trees', 'Flowering Shrubs', 'Perennial Flowers', 'Annual Flowers', 'Ornamental Trees', 'Houseplants', 'Succulents', 'Bulbs', 'Native Plants']
-        
-        if classification['plant_group'] not in valid_plant_groups:
+
+        is_plant = bool(classification.get("is_plant"))
+        plant_group = classification.get("plant_group")
+
+        valid_plant_groups = [
+            'Vegetables', 'Herbs', 'Fruit Trees', 'Flowering Shrubs', 'Perennial Flowers',
+            'Annual Flowers', 'Ornamental Trees', 'Houseplants', 'Succulents', 'Bulbs', 'Native Plants'
+        ]
+
+        if not is_plant:
+            # For non-plant, expect plant_group to be None/null
+            if plant_group is not None:
+                logger.error(f"Non-plant input must have plant_group=null. Got: {classification}")
+                return None
+            logger.info(f"Input '{plant_name}' determined to be non-plant: {classification.get('message')}")
+            return {"is_plant": False, "message": classification.get("message")}
+
+        # is_plant is True: validate group
+        if plant_group not in valid_plant_groups:
             logger.error(f"Invalid classification values: {classification}")
             return None
-        
+
         logger.info(f"Plant '{plant_name}' classified as: {classification}")
-        return classification
+        return {"is_plant": True, "plant_group": plant_group}
         
     except json.JSONDecodeError as json_e:
         logger.error(f"Failed to decode JSON response from LLM for plant care classification: {json_e}")
@@ -104,6 +120,10 @@ def get_plant_group_and_prompt(plant_name: str) -> Optional[Dict[str, str]]:
         logger.error(f"Could not classify plant group for '{plant_name}'")
         return None
 
+    # If not a plant, bubble up this information
+    if not plant_classification.get("is_plant", True):
+        return {"is_plant": False, "message": plant_classification.get("message")}
+
     plant_group = plant_classification["plant_group"]
     
     # Step 2: Map group to prompt function
@@ -115,6 +135,7 @@ def get_plant_group_and_prompt(plant_name: str) -> Optional[Dict[str, str]]:
     logger.info(f"Plant '{plant_name}' classified as {plant_group} using {prompt_function} prompt")
     
     return {
+        "is_plant": True,
         "plant_group": plant_group,
         "prompt_function": prompt_function
-    } 
+    }

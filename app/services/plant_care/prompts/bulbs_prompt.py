@@ -17,16 +17,14 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
   "zoneSuitability": "[match OR close OR far]",
   "seedStartingMonth": null,
   "plantingMonth": "[Month(s) or range for planting bulbs; e.g., Sep–Nov for spring bulbs or Mar–Apr for summer bulbs]",
-  "typeSpecific": {{
-    "bulbType": "[True bulb OR Corm OR Tuber OR Rhizome]"
-  }},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[During growing season only OR Minimal after dormancy OR Consistent spring moisture]",
     "soil": "[Well-draining, fertile OR Sandy, well-draining OR Rich but draining]",
     "drainage": "[Excellent drainage required OR Good drainage OR Tolerates some moisture]",
     "chilling": "[Requires cold treatment OR Pre-chilled OR Natural winter chill]",
-    "plantingDepth": "[3x bulb height OR Specific depth requirement]"
+    "plantingDepth": "[3x bulb height OR Specific depth requirement]",
+    "bulbType": "[True bulb OR Corm OR Tuber OR Rhizome]"
   }},
   "seed_starting": [],
   "planting": [
@@ -58,6 +56,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact ranges). No sentences.
 1. Provide exact planting timing based on soil temperature and frost dates. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Keep planting guidance in the planting section; care_plan should only cover Grow and Post‑Bloom (post‑plant tasks). Keep 1–3 items per tab
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".

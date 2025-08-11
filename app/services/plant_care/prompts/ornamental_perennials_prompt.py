@@ -17,15 +17,14 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
   "zoneSuitability": "[match OR close OR far]",
   "seedStartingMonth": null,
   "plantingMonth": "[Month(s) or range for planting/division; e.g., Apr–May or Sep–Oct]",
-  "typeSpecific": {{}},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Drought tolerant]",
     "soil": "[Well-draining, fertile OR Sandy loam OR Rich, organic]",
-    "pH": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
+    "ph": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
     "spacing": "[Plant spacing requirements - e.g., 18-24 inches apart]",
-    "bloom_time": "[Spring OR Summer OR Fall OR Multiple seasons]",
-    "mature_size": "[Height x Width - e.g., 2-3 feet tall, 2 feet wide]"
+    "bloomTime": "[Spring OR Summer OR Fall OR Multiple seasons]",
+    "matureSize": "[Height x Width - e.g., 2-3 feet tall, 2 feet wide]"
   }},
   "seed_starting": [],
   "planting": [
@@ -71,6 +70,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive ornamental perennial
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact ranges like "18–24 in"). No sentences.
 1. All "when" values must be tied to local climate patterns. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Use seasonal tabs (Spring, Summer, Fall, Winter). Keep 1–3 concise items per tab (max 8 total)
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".

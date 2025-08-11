@@ -17,12 +17,11 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
   "zoneSuitability": "[match OR close OR far]",
   "seedStartingMonth": null,
   "plantingMonth": "[Month(s) or range for planting; e.g., Mar–Apr for bare-root or Oct–Nov in mild climates]",
-  "typeSpecific": {{}},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Moderate]",
     "soil": "[Well-draining, fertile OR Sandy loam OR Rich, organic]",
-    "pH": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
+    "ph": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
     "spacing": "[Tree spacing requirements - e.g., 15-20 feet apart]",
     "pollination": "[Self-fertile OR Needs pollinator OR Cross-pollination helpful]",
     "rootstock": "[Standard OR Semi-dwarf OR Dwarf OR Variety-specific]"
@@ -71,6 +70,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive fruit tree growing g
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact ranges like "15–20 ft"). No sentences.
 1. All "when" values must reference local frost dates and growing season. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Use seasonal tabs (Spring, Summer, Fall, Winter). Keep 1–3 concise items per tab (max 8 total)
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".

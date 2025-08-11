@@ -17,17 +17,14 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
   "zoneSuitability": "[match OR close OR far]",
   "seedStartingMonth": "[Month(s) or range for starting seeds; e.g., Feb–Mar indoors]",
   "plantingMonth": "[Month(s) or range for transplanting/direct sowing; e.g., Apr–May after last frost]",
-  "typeSpecific": {{
-    "daysToBloom": "[e.g., 60-80 days OR 45 days to first flowers]"
-  }},
   "requirements": {{
     "sun": "[Full Sun OR Partial Shade OR Full Shade]",
     "water": "[Deep weekly OR Consistent moisture OR Moderate]",
     "soil": "[Well-draining, fertile OR Sandy loam OR Rich, organic]",
-    "pH": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
+    "ph": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
     "spacing": "[Plant spacing requirements - e.g., 8-12 inches apart]",
-    "companions": ["[Beneficial companion plants]"],
-    "bloom_period": "[Spring through frost OR Summer months OR Specific season]"
+    "bloomPeriod": "[Spring through frost OR Summer months OR Specific season]",
+    "daysToBloom": "[e.g., 60-80 days OR 45 days to first flowers]"
   }},
   "seed_starting": [
     {{
@@ -65,6 +62,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive annual flower growin
 ```
 
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact ranges like "8–12 in" or "60–80 days"). No sentences.
 1. All timing must use local frost dates and growing season. Do not include the words "Zone" or phrases like "in Zone {user_zone}" anywhere (not in text, tips, or when fields). Use only months/ranges or relative phrases.
 2. Provide concise summary fields: seedStartingMonth and plantingMonth (month names/ranges only, no "Zone" wording). Keep seed starting and planting details in their dedicated sections; care_plan should only contain post-plant lifecycle tasks (Grow/Bloom, End)
 3. Include succession planting advice in care_plan only if it affects in‑season management

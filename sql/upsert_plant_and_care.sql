@@ -30,13 +30,13 @@ begin
         plant_name, zone, description, type, sun_requirements,
         seed_starting_month, planting_month, seed_starting_instructions,
         planting_instructions, zone_suitability, seasonality, plant_group,
-        requirements, type_specific, seed_starting, planting, care_plan,
+        requirements, seed_starting, planting, care_plan,
         model_used, raw_llm_response
       ) values (
         plant->>'plant_name', null, plant->>'description', plant->>'type', plant->>'sun_requirements',
         plant->>'seed_starting_month', plant->>'planting_month', plant->'seed_starting_instructions',
         plant->'planting_instructions', plant->>'zone_suitability', plant->>'seasonality', plant->>'plant_group',
-        plant->'requirements', plant->'type_specific', plant->'seed_starting', plant->'planting', plant->'care_plan',
+        plant->'requirements', plant->'seed_starting', plant->'planting', plant->'care_plan',
         plant->>'model_used', plant->'raw_llm_response'
       ) returning plant_id into v_plant_id;
     else
@@ -52,7 +52,6 @@ begin
         seasonality = plant->>'seasonality',
         plant_group = plant->>'plant_group',
         requirements = plant->'requirements',
-        type_specific = plant->'type_specific',
         seed_starting = plant->'seed_starting',
         planting = plant->'planting',
         care_plan = plant->'care_plan',
@@ -71,13 +70,13 @@ begin
         plant_name, zone, description, type, sun_requirements,
         seed_starting_month, planting_month, seed_starting_instructions,
         planting_instructions, zone_suitability, seasonality, plant_group,
-        requirements, type_specific, seed_starting, planting, care_plan,
+        requirements, seed_starting, planting, care_plan,
         model_used, raw_llm_response
       ) values (
         plant->>'plant_name', v_zone, plant->>'description', plant->>'type', plant->>'sun_requirements',
         plant->>'seed_starting_month', plant->>'planting_month', plant->'seed_starting_instructions',
         plant->'planting_instructions', plant->>'zone_suitability', plant->>'seasonality', plant->>'plant_group',
-        plant->'requirements', plant->'type_specific', plant->'seed_starting', plant->'planting', plant->'care_plan',
+        plant->'requirements', plant->'seed_starting', plant->'planting', plant->'care_plan',
         plant->>'model_used', plant->'raw_llm_response'
       ) returning plant_id into v_plant_id;
     else
@@ -93,7 +92,6 @@ begin
         seasonality = plant->>'seasonality',
         plant_group = plant->>'plant_group',
         requirements = plant->'requirements',
-        type_specific = plant->'type_specific',
         seed_starting = plant->'seed_starting',
         planting = plant->'planting',
         care_plan = plant->'care_plan',

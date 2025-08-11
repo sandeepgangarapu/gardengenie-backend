@@ -84,6 +84,10 @@ async def get_plant_care_instructions(payload: PlantCareInput, request: Request,
         payload.persist,     # control DB upsert per request; default True
     )
     
+    # If the input was determined not to be a plant, return a clear 400
+    if isinstance(care_info, dict) and care_info.get("__non_plant"):
+        raise HTTPException(status_code=400, detail=care_info.get("message", "Input does not appear to be a plant."))
+
     if care_info is None:
         raise HTTPException(status_code=503, detail="Error generating plant care instructions.")
 

@@ -15,15 +15,13 @@ Act as a Zone-Aware Master Gardener providing comprehensive indoor houseplant ca
   "zoneSuitability": null,
   "seedStartingMonth": null,
   "plantingMonth": null,
-  "typeSpecific": {
-    "lightPreference": "[Bright indirect OR Low light tolerant OR Direct sun tolerant]"
-  },
   "requirements": {
     "sun": "[Bright indirect OR Medium light OR Low light]",
     "water": "[Allow top inch to dry OR Keep evenly moist OR Dry between waterings]",
     "soil": "[Well-draining potting mix OR Aroid mix OR Cactus mix]",
     "humidity": "[Average home humidity OK OR Needs higher humidity]",
-    "temperature": "[Typical indoor range OR Avoid below 55F]"
+    "temperature": "[Typical indoor range OR Avoid below 55F]",
+    "lightPreference": "[Bright indirect OR Low light tolerant OR Direct sun tolerant]"
   },
   "seed_starting": [],
   "planting": [
@@ -56,6 +54,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive indoor houseplant ca
 ```
 
 **CRUCIAL INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact ranges). No sentences.
 1. Do not include the word "Zone" anywhere. Tailor advice to typical indoor conditions.
 2. Use indoor tabs (Year‑Round, Winter). Keep 1–3 concise items per tab (max 8 total)
 3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
@@ -76,9 +75,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive indoor plant care gu
   "type": "[Annual OR Perennial]",
   "seasonality": null,
   "zoneSuitability": null,
-  "typeSpecific": {{}},
   "requirements": {{
-    "light": "[Bright Light OR Medium Light OR Low Light]",
+    "sun": "[Bright Light OR Medium Light OR Low Light]",
     "water": "[Deep weekly OR Light frequent OR Allow to dry between waterings]",
     "humidity": "[High (60%+) OR Medium (40-60%) OR Low (30-40%)]",
     "temperature": "[65-75°F OR 60-70°F OR 70-80°F]",
@@ -118,6 +116,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive indoor plant care gu
 ```
 
 **CRUCIAL INSTRUCTIONS:**
+• Keep `requirements` values extremely concise (1–3 words or compact phrases). No sentences.
 1. Provide care_plan with tabs (Year‑round, Summer, Winter). Keep 1–3 concise items per tab (max 8 total)
 2. Each item has: text (what to do), when (month/range or "Anytime"), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
 3. Include tasks for watering, fertilizing, repotting, pest monitoring, pruning, humidity
