@@ -51,16 +51,29 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
+        """
+        Return CORS origins based on environment.
+        In production, prioritize production URLs but also allow localhost for testing.
+        In development, allow both localhost and production URLs for flexibility.
+        """
         env = (self.app_env or "development").lower()
-        if env == "production":
-            return [
-                "https://gardengenie.lovable.app",
-            ]
-        return [
-            "http://localhost",
-            "http://localhost:8000",
-            "http://localhost:3000",
+        
+        # Base origins that are always allowed
+        base_origins = [
+            "https://gardengenie.lovable.app",  # Production frontend
+            "http://localhost",                 # Local development
+            "http://localhost:8000",           # Local backend
+            "http://localhost:3000",           # Local frontend (common React port)
+            "http://127.0.0.1:8000",          # Alternative localhost
+            "http://127.0.0.1:3000",          # Alternative localhost
         ]
+        
+        if env == "production":
+            logger.info("CORS configured for production environment")
+            return base_origins
+        else:
+            logger.info("CORS configured for development environment")
+            return base_origins
 
 
 def _validate_on_startup(settings: Settings) -> None:
