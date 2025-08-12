@@ -61,6 +61,9 @@ class Settings(BaseSettings):
         # Base origins that are always allowed
         base_origins = [
             "https://gardengenie.lovable.app",  # Production frontend
+            "https://www.garden-genie.com",     # Production domain (www)
+            "https://garden-genie.com",         # Production domain (no www)
+            "https://gardengenie.vercel.app",   # Vercel deployment
             "http://localhost",                 # Local development
             "http://localhost:8000",           # Local backend
             "http://localhost:3000",           # Local frontend (common React port)
