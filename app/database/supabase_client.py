@@ -38,9 +38,10 @@ def get_supabase_client() -> Optional[Client]:
 def validate_care_structure(care_details: Any, plant_name: str = "Unknown") -> Dict[str, Any]:
     """
     Validate the care instructions structure from LLM response.
+    Supports both new priority-based and legacy structures.
     
     Args:
-        care_details: The care section from LLM response
+        care_details: The care section from LLM response (could be care_plan or legacy care)
         plant_name: Plant name for logging context
         
     Returns:
@@ -66,44 +67,139 @@ def validate_care_structure(care_details: Any, plant_name: str = "Unknown") -> D
     valid_priorities = ['must do', 'good to do', 'optional']
     total_instructions = 0
     
-    # Validate each care phase/section
-    for care_phase, steps in care_details.items():
-        if not isinstance(steps, list):
-            validation_result['valid'] = False
-            validation_result['errors'].append(f"Care phase '{care_phase}' must contain a list of steps, got {type(steps).__name__}")
-            continue
+    # Check if this is the new priority-based structure
+    has_priority_fields = any([
+        'must_do' in care_details,
+        'good_to_do' in care_details, 
+        'optional' in care_details
+    ])
+    
+    # Check if this is the legacy tab-based structure
+    has_tab_fields = 'tabs' in care_details
+    
+    if has_priority_fields:
+        # Validate new priority-based structure
+        logger.debug(f"Validating priority-based care structure for '{plant_name}'")
+        
+        priority_fields = ['must_do', 'good_to_do', 'optional']
+        for field_name in priority_fields:
+            items = care_details.get(field_name, [])
             
-        if not steps:
-            validation_result['warnings'].append(f"Care phase '{care_phase}' has no care instructions")
-            continue
-            
-        # Validate each step in the care phase
-        for i, step_detail in enumerate(steps):
-            step_context = f"Care phase '{care_phase}', step {i+1}"
-            
-            if not isinstance(step_detail, dict):
+            if not isinstance(items, list):
                 validation_result['valid'] = False
-                validation_result['errors'].append(f"{step_context}: Step must be a dictionary, got {type(step_detail).__name__}")
+                validation_result['errors'].append(f"care_plan.{field_name} must be a list, got {type(items).__name__}")
                 continue
-            
-            # Check required fields
-            step_description = step_detail.get('step')
-            if not step_description or not isinstance(step_description, str) or not step_description.strip():
+                
+            for i, item in enumerate(items):
+                item_context = f"care_plan.{field_name}[{i}]"
+                
+                if not isinstance(item, dict):
+                    validation_result['valid'] = False
+                    validation_result['errors'].append(f"{item_context}: Item must be a dictionary, got {type(item).__name__}")
+                    continue
+                
+                # Check required fields
+                text_value = item.get('text')
+                if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                    validation_result['valid'] = False
+                    validation_result['errors'].append(f"{item_context}: Missing or empty 'text' field")
+                
+                # Check timing information
+                when_value = item.get('when')
+                if not when_value:
+                    validation_result['warnings'].append(f"{item_context}: No 'when' timing information provided")
+                
+                total_instructions += 1
+                
+    elif has_tab_fields:
+        # Validate legacy tab-based structure
+        logger.debug(f"Validating legacy tab-based care structure for '{plant_name}'")
+        
+        tabs = care_details.get('tabs', [])
+        if not isinstance(tabs, list):
+            validation_result['valid'] = False
+            validation_result['errors'].append(f"care_plan.tabs must be a list, got {type(tabs).__name__}")
+        else:
+            for tab_i, tab in enumerate(tabs):
+                tab_context = f"care_plan.tabs[{tab_i}]"
+                
+                if not isinstance(tab, dict):
+                    validation_result['valid'] = False
+                    validation_result['errors'].append(f"{tab_context}: Tab must be a dictionary, got {type(tab).__name__}")
+                    continue
+                
+                items = tab.get('items', [])
+                if not isinstance(items, list):
+                    validation_result['valid'] = False
+                    validation_result['errors'].append(f"{tab_context}.items must be a list, got {type(items).__name__}")
+                    continue
+                
+                for item_i, item in enumerate(items):
+                    item_context = f"{tab_context}.items[{item_i}]"
+                    
+                    if not isinstance(item, dict):
+                        validation_result['valid'] = False
+                        validation_result['errors'].append(f"{item_context}: Item must be a dictionary, got {type(item).__name__}")
+                        continue
+                    
+                    # Check required fields
+                    text_value = item.get('text')
+                    if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                        validation_result['valid'] = False
+                        validation_result['errors'].append(f"{item_context}: Missing or empty 'text' field")
+                    
+                    # Validate priority if present
+                    priority = item.get('priority')
+                    if priority and priority not in valid_priorities:
+                        validation_result['warnings'].append(f"{item_context}: Invalid priority '{priority}'. Expected one of {valid_priorities}")
+                    
+                    # Check timing information
+                    when_value = item.get('when')
+                    if not when_value:
+                        validation_result['warnings'].append(f"{item_context}: No 'when' timing information provided")
+                    
+                    total_instructions += 1
+    else:
+        # Validate very old legacy structure (care phases as keys)
+        logger.debug(f"Validating legacy care dictionary structure for '{plant_name}'")
+        
+        for care_phase, steps in care_details.items():
+            if not isinstance(steps, list):
                 validation_result['valid'] = False
-                validation_result['errors'].append(f"{step_context}: Missing or empty 'step' description")
-            
-            # Validate priority if present
-            priority = step_detail.get('priority')
-            if priority and priority not in valid_priorities:
-                validation_result['warnings'].append(f"{step_context}: Invalid priority '{priority}'. Expected one of {valid_priorities}")
-            
-            # Check for timing information (months or timing fields)
-            months = step_detail.get('months')
-            timing = step_detail.get('timing')
-            if not months and not timing:
-                validation_result['warnings'].append(f"{step_context}: No timing information (months or timing) provided")
-            
-            total_instructions += 1
+                validation_result['errors'].append(f"Care phase '{care_phase}' must contain a list of steps, got {type(steps).__name__}")
+                continue
+                
+            if not steps:
+                validation_result['warnings'].append(f"Care phase '{care_phase}' has no care instructions")
+                continue
+                
+            # Validate each step in the care phase
+            for i, step_detail in enumerate(steps):
+                step_context = f"Care phase '{care_phase}', step {i+1}"
+                
+                if not isinstance(step_detail, dict):
+                    validation_result['valid'] = False
+                    validation_result['errors'].append(f"{step_context}: Step must be a dictionary, got {type(step_detail).__name__}")
+                    continue
+                
+                # Check required fields
+                step_description = step_detail.get('step')
+                if not step_description or not isinstance(step_description, str) or not step_description.strip():
+                    validation_result['valid'] = False
+                    validation_result['errors'].append(f"{step_context}: Missing or empty 'step' description")
+                
+                # Validate priority if present
+                priority = step_detail.get('priority')
+                if priority and priority not in valid_priorities:
+                    validation_result['warnings'].append(f"{step_context}: Invalid priority '{priority}'. Expected one of {valid_priorities}")
+                
+                # Check for timing information (months or timing fields)
+                months = step_detail.get('months')
+                timing = step_detail.get('timing')
+                if not months and not timing:
+                    validation_result['warnings'].append(f"{step_context}: No timing information (months or timing) provided")
+                
+                total_instructions += 1
     
     # Final validation checks
     if total_instructions == 0:
@@ -222,14 +318,17 @@ def store_plant_and_care_instructions(
         logger.error(f"Missing essential plantName or zone in care_info: {care_info}")
         return False
 
-    # Validate legacy care structure only if no new care_plan is present
-    if not care_plan_json:
-        care_validation = validate_care_structure(care_details, plant_name)
+    # Validate care structure - prioritize care_plan_json, fallback to legacy care_details
+    structure_to_validate = care_plan_json if care_plan_json else care_details
+    if structure_to_validate:
+        care_validation = validate_care_structure(structure_to_validate, plant_name)
         if not care_validation['valid']:
             logger.error(f"Invalid care structure for '{plant_name}': {care_validation['errors']}")
             return False
         if care_validation['warnings']:
             logger.warning(f"Care structure warnings for '{plant_name}': {care_validation['warnings']}")
+    else:
+        logger.warning(f"No care structure found for '{plant_name}' - neither care_plan nor legacy care data")
 
     plant_uuid: Optional[str] = None
 
@@ -277,42 +376,106 @@ def store_plant_and_care_instructions(
             key_original = (tab_key or '').strip()
             return key_original if key_original else 'General'
 
-        if care_plan_json and isinstance(care_plan_json, dict):
+        def process_priority_based_care_plan() -> None:
+            """Process new priority-based care plan structure."""
+            logger.debug(f"Processing priority-based care plan for '{plant_name}'")
+            
+            priority_levels = [
+                ('must_do', 'must do', 'Must Do'),
+                ('good_to_do', 'good to do', 'Good To Do'), 
+                ('optional', 'optional', 'Optional')
+            ]
+            
+            for field_name, priority_value, care_phase_name in priority_levels:
+                items = care_plan_json.get(field_name, [])
+                if not isinstance(items, list):
+                    logger.warning(f"care_plan.{field_name} is not a list for '{plant_name}'. Skipping.")
+                    continue
+                    
+                for i, item in enumerate(items):
+                    if not isinstance(item, dict):
+                        logger.warning(f"care_plan.{field_name}[{i}] is not a dict for '{plant_name}'. Skipping.")
+                        continue
+                        
+                    text_value = item.get('text')
+                    if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                        logger.warning(f"care_plan.{field_name}[{i}] missing or empty text for '{plant_name}'. Skipping.")
+                        continue
+                        
+                    instruction_row = {
+                        'care_phase': care_phase_name,
+                        'months': item.get('when'),
+                        'step_description': text_value.strip(),
+                        'priority': priority_value,
+                        'order_within_season': i + 1,
+                    }
+                    care_rows.append(instruction_row)
+                    
+            logger.debug(f"Processed priority-based care plan: {len(care_rows)} instructions for '{plant_name}'")
+
+        def process_tab_based_care_plan() -> None:
+            """Process legacy tab-based care plan structure.""" 
+            logger.debug(f"Processing legacy tab-based care plan for '{plant_name}'")
+            
             style = care_plan_json.get('style')
             tabs = care_plan_json.get('tabs') or []
-            if isinstance(tabs, list):
-                for tab in tabs:
-                    if not isinstance(tab, dict):
+            
+            if not isinstance(tabs, list):
+                logger.warning(f"care_plan.tabs is not a list for '{plant_name}'. Skipping tab-based processing.")
+                return
+                
+            for tab in tabs:
+                if not isinstance(tab, dict):
+                    logger.warning(f"Tab is not a dict for '{plant_name}'. Skipping tab.")
+                    continue
+                    
+                care_phase = map_phase_from_tab(style, tab.get('key'), tab.get('label'), final_plant_group)
+                items = tab.get('items') or []
+                
+                if not isinstance(items, list):
+                    logger.warning(f"Tab items is not a list for '{plant_name}' tab '{care_phase}'. Skipping tab.")
+                    continue
+                    
+                for i, item in enumerate(items):
+                    if not isinstance(item, dict):
+                        logger.warning(f"Tab item is not a dict for '{plant_name}' tab '{care_phase}'. Skipping item.")
                         continue
-                    care_phase = map_phase_from_tab(style, tab.get('key'), tab.get('label'), final_plant_group)
-                    items = tab.get('items') or []
-                    if not isinstance(items, list):
+                        
+                    text_value = item.get('text')
+                    if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                        logger.warning(f"Tab item missing text for '{plant_name}' tab '{care_phase}'. Skipping item.")
                         continue
-                    for i, item in enumerate(items):
-                        if not isinstance(item, dict):
-                            continue
-                        text_value = item.get('text')
-                        if not text_value or not isinstance(text_value, str) or not text_value.strip():
-                            continue
-                        instruction_row = {
-                            'care_phase': care_phase,
-                            'months': item.get('when'),
-                            'step_description': text_value.strip(),
-                            'priority': item.get('priority'),
-                            'order_within_season': i + 1,
-                        }
-                        care_rows.append(instruction_row)
-        else:
-            # Legacy care path
+                        
+                    instruction_row = {
+                        'care_phase': care_phase,
+                        'months': item.get('when'),
+                        'step_description': text_value.strip(),
+                        'priority': item.get('priority'),
+                        'order_within_season': i + 1,
+                    }
+                    care_rows.append(instruction_row)
+                    
+            logger.debug(f"Processed tab-based care plan: {len(care_rows)} instructions for '{plant_name}'")
+
+        def process_legacy_care_dict() -> None:
+            """Process very old legacy care dictionary structure."""
+            logger.debug(f"Processing legacy care dictionary for '{plant_name}'")
+            
             for care_phase, steps in care_details.items():
                 if not isinstance(steps, list):
+                    logger.warning(f"Legacy care phase '{care_phase}' is not a list for '{plant_name}'. Skipping.")
                     continue
+                    
                 for i, step_detail in enumerate(steps):
                     if not isinstance(step_detail, dict):
+                        logger.warning(f"Legacy care step is not a dict for '{plant_name}' phase '{care_phase}'. Skipping.")
                         continue
+                        
                     step_description = step_detail.get('step')
                     if not step_description or not isinstance(step_description, str) or not step_description.strip():
+                        logger.warning(f"Legacy care step missing description for '{plant_name}' phase '{care_phase}'. Skipping.")
                         continue
+                        
                     instruction_row = {
                         'care_phase': care_phase,
                         'months': step_detail.get('months'),
@@ -321,6 +484,36 @@ def store_plant_and_care_instructions(
                         'order_within_season': i + 1,
                     }
                     care_rows.append(instruction_row)
+                    
+            logger.debug(f"Processed legacy care dict: {len(care_rows)} instructions for '{plant_name}'")
+
+        # Main processing logic - try structures in order of preference
+        if care_plan_json and isinstance(care_plan_json, dict):
+            # Check if it's the new priority-based structure
+            has_priority_fields = any([
+                'must_do' in care_plan_json,
+                'good_to_do' in care_plan_json, 
+                'optional' in care_plan_json
+            ])
+            
+            # Check if it's the legacy tab-based structure  
+            has_tab_fields = 'tabs' in care_plan_json
+            
+            if has_priority_fields:
+                logger.info(f"Detected new priority-based care plan structure for '{plant_name}'")
+                process_priority_based_care_plan()
+            elif has_tab_fields:
+                logger.info(f"Detected legacy tab-based care plan structure for '{plant_name}'")
+                process_tab_based_care_plan()
+            else:
+                logger.warning(f"Unknown care_plan structure for '{plant_name}': {list(care_plan_json.keys())}")
+        else:
+            # Fall back to very old legacy structure
+            if care_details and isinstance(care_details, dict):
+                logger.info(f"Falling back to legacy care dictionary structure for '{plant_name}'")
+                process_legacy_care_dict()
+            else:
+                logger.warning(f"No valid care structure found for '{plant_name}'")
 
         return care_rows
 
@@ -454,38 +647,112 @@ def store_plant_and_care_instructions(
             key_original = (tab_key or '').strip()
             return key_original if key_original else 'General'
 
-        if care_plan_json and isinstance(care_plan_json, dict):
+        def process_priority_based_fallback() -> None:
+            """Process new priority-based care plan in fallback mode."""
+            nonlocal skipped_instructions
+            logger.debug(f"Processing priority-based care plan (fallback) for '{plant_name}'")
+            
+            priority_levels = [
+                ('must_do', 'must do', 'Must Do'),
+                ('good_to_do', 'good to do', 'Good To Do'), 
+                ('optional', 'optional', 'Optional')
+            ]
+            
+            for field_name, priority_value, care_phase_name in priority_levels:
+                items = care_plan_json.get(field_name, [])
+                if not isinstance(items, list):
+                    logger.warning(f"care_plan.{field_name} is not a list for '{plant_name}' (fallback). Skipping.")
+                    skipped_instructions += 1
+                    continue
+                    
+                for i, item in enumerate(items):
+                    if not isinstance(item, dict):
+                        logger.warning(f"care_plan.{field_name}[{i}] is not a dict for '{plant_name}' (fallback). Skipping.")
+                        skipped_instructions += 1
+                        continue
+                        
+                    text_value = item.get('text')
+                    if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                        logger.warning(f"care_plan.{field_name}[{i}] missing or empty text for '{plant_name}' (fallback). Skipping.")
+                        skipped_instructions += 1
+                        continue
+                        
+                    instruction_row = {
+                        'plant_id': plant_uuid,
+                        'care_phase': care_phase_name,
+                        'months': item.get('when'),
+                        'step_description': text_value.strip(),
+                        'priority': priority_value,
+                        'order_within_season': i + 1,
+                    }
+                    care_instructions_to_insert.append(instruction_row)
+
+        def process_tab_based_fallback() -> None:
+            """Process legacy tab-based care plan in fallback mode."""
+            nonlocal skipped_instructions
+            logger.debug(f"Processing tab-based care plan (fallback) for '{plant_name}'")
+            
             style = care_plan_json.get('style')
             tabs = care_plan_json.get('tabs') or []
+            
             if not isinstance(tabs, list):
-                logger.warning(f"care_plan.tabs is not a list for '{plant_name}'. Skipping care_plan ingestion.")
+                logger.warning(f"care_plan.tabs is not a list for '{plant_name}' (fallback). Skipping care_plan ingestion.")
+                skipped_instructions += 1
+                return
+                
+            for tab in tabs:
+                if not isinstance(tab, dict):
+                    skipped_instructions += 1
+                    continue
+                    
+                care_phase = map_phase_from_tab(style, tab.get('key'), tab.get('label'), final_plant_group)
+                items = tab.get('items') or []
+                
+                if not isinstance(items, list):
+                    skipped_instructions += 1
+                    continue
+                    
+                for i, item in enumerate(items):
+                    if not isinstance(item, dict):
+                        skipped_instructions += 1
+                        continue
+                        
+                    text_value = item.get('text')
+                    if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                        skipped_instructions += 1
+                        continue
+                        
+                    instruction_row = {
+                        'plant_id': plant_uuid,
+                        'care_phase': care_phase,
+                        'months': item.get('when'),
+                        'step_description': text_value.strip(),
+                        'priority': item.get('priority'),
+                        'order_within_season': i + 1,
+                    }
+                    care_instructions_to_insert.append(instruction_row)
+
+        # Main fallback processing logic
+        if care_plan_json and isinstance(care_plan_json, dict):
+            # Check if it's the new priority-based structure
+            has_priority_fields = any([
+                'must_do' in care_plan_json,
+                'good_to_do' in care_plan_json, 
+                'optional' in care_plan_json
+            ])
+            
+            # Check if it's the legacy tab-based structure  
+            has_tab_fields = 'tabs' in care_plan_json
+            
+            if has_priority_fields:
+                logger.info(f"Detected new priority-based care plan structure for '{plant_name}' (fallback)")
+                process_priority_based_fallback()
+            elif has_tab_fields:
+                logger.info(f"Detected legacy tab-based care plan structure for '{plant_name}' (fallback)")
+                process_tab_based_fallback()
             else:
-                for tab in tabs:
-                    if not isinstance(tab, dict):
-                        skipped_instructions += 1
-                        continue
-                    care_phase = map_phase_from_tab(style, tab.get('key'), tab.get('label'), final_plant_group)
-                    items = tab.get('items') or []
-                    if not isinstance(items, list):
-                        skipped_instructions += 1
-                        continue
-                    for i, item in enumerate(items):
-                        if not isinstance(item, dict):
-                            skipped_instructions += 1
-                            continue
-                        text_value = item.get('text')
-                        if not text_value or not isinstance(text_value, str) or not text_value.strip():
-                            skipped_instructions += 1
-                            continue
-                        instruction_row = {
-                            'plant_id': plant_uuid,
-                            'care_phase': care_phase,
-                            'months': item.get('when'),
-                            'step_description': text_value.strip(),
-                            'priority': item.get('priority'),
-                            'order_within_season': i + 1,
-                        }
-                        care_instructions_to_insert.append(instruction_row)
+                logger.warning(f"Unknown care_plan structure for '{plant_name}' (fallback): {list(care_plan_json.keys())}")
+                skipped_instructions += 1
         else:
             # Legacy path using 'care' dict with list of steps
             for care_phase, steps in care_details.items():

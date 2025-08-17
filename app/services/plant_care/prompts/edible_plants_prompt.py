@@ -23,6 +23,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive growing guidance for
     "soil": "[Well-draining, fertile OR Sandy loam OR Rich, organic]",
     "ph": "[6.0-7.0 OR 6.5-7.5 OR Specific range]",
     "spacing": "[Plant spacing requirements - e.g., 12-18 inches apart]",
+    "rowSpacing": "[Row spacing distance - e.g., 18-24 inches apart OR N/A for single plants]",
     "daysToMaturity": "[e.g., 60-80 days OR 45 days to first harvest]"
   }},
   "seed_starting": [
@@ -38,32 +39,13 @@ Act as a Zone-Aware Master Gardener providing comprehensive growing guidance for
     }}
   ],
   "care_plan": {{
-    "style": "lifecycle",
-    "tabs": [
-      {{
-        "key": "grow",
-        "label": "Grow",
-        "items": [
-          {{ "text": "[Water consistently; mulch; side-dress or feed as appropriate]", "when": "[During active growth, e.g., May–August]", "priority": "must do" }},
-          {{ "text": "[Succession sow every 2–3 weeks for continuous harvest]", "when": "[Every 2–3 weeks until ~8 weeks before first frost]", "priority": "good to do" }}
-        ]
-      }},
-      {{
-        "key": "harvest",
-        "label": "Harvest",
-        "items": [
-          {{ "text": "[Harvest at maturity using crop-specific indicators]", "when": "[e.g., Jun–Sep]", "priority": "must do" }},
-          {{ "text": "[Handle and store properly for best shelf life]", "when": "[Immediately after harvest]", "priority": "good to do" }}
-        ]
-      }},
-      {{
-        "key": "end",
-        "label": "End",
-        "items": [
-          {{ "text": "[Remove spent plants; compost debris; prep beds for next crop]", "when": "[After final harvest or first frost]", "priority": "good to do" }}
-        ]
-      }}
-    ]
+    "must_do": [
+      {{ "text": "[Essential care tasks for this edible plant]", "when": "[Critical timing periods]" }}
+    ],
+    "good_to_do": [
+      {{ "text": "[Beneficial tasks for better yields]", "when": "[Recommended timing]" }}
+    ],
+    "optional": []
   }}
 }}
 ```
@@ -71,9 +53,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive growing guidance for
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
 • Keep `requirements` values extremely concise (1–3 words or compact ranges like "12–18 in" or "60–80 days"). No sentences.
 1. All "when" values should use local frost dates and season length. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
-2. Provide concise summary fields: seedStartingMonth and plantingMonth (month names/ranges only, no "Zone" wording). Keep seed starting and planting details in their dedicated sections; care_plan should only cover Grow, Harvest, End (post‑plant tasks)
-3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
-4. Include succession planting guidance in Grow; pest/disease monitoring where relevant
- 5. Add expected yields and days to maturity information
- 6. Address soil preparation needs specific to the region
+2. Provide concise summary fields: seedStartingMonth and plantingMonth (month names/ranges only, no "Zone" wording). Keep seed starting and planting details in their dedicated sections; care_plan should only cover post-plant tasks organized by priority
+3. Each care_plan item has only: text, when (month/range or relative phrase). Tasks are organized into must_do (essential), good_to_do (recommended), and optional arrays.
+4. Include succession planting guidance and pest/disease monitoring where relevant for this crop
+5. Address soil preparation and fertility needs specific to the crop and region
 """

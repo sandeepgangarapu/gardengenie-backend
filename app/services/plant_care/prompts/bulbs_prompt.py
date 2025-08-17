@@ -24,6 +24,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
     "drainage": "[Excellent drainage required OR Good drainage OR Tolerates some moisture]",
     "chilling": "[Requires cold treatment OR Pre-chilled OR Natural winter chill]",
     "plantingDepth": "[3x bulb height OR Specific depth requirement]",
+    "rowSpacing": "[Row spacing distance - e.g., 6-8 inches apart OR N/A for naturalized planting]",
     "bulbType": "[True bulb OR Corm OR Tuber OR Rhizome]"
   }},
   "seed_starting": [],
@@ -34,23 +35,13 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
     }}
   ],
   "care_plan": {{
-    "style": "lifecycle",
-    "tabs": [
-      {{
-        "key": "grow",
-        "label": "Grow",
-        "items": [
-          {{ "text": "[Support spring growth with water and light feeding]", "when": "[Mar–May]", "priority": "good to do" }}
-        ]
-      }},
-      {{
-        "key": "post_bloom",
-        "label": "Post‑Bloom",
-        "items": [
-          {{ "text": "[Deadhead; allow foliage to die back naturally]", "when": "[6–8 weeks after bloom]", "priority": "must do" }}
-        ]
-      }}
-    ]
+    "must_do": [
+      {{ "text": "[Essential post-bloom care for bulb health]", "when": "[After flowering period]" }}
+    ],
+    "good_to_do": [
+      {{ "text": "[Supporting tasks for optimal growth]", "when": "[Growing season]" }}
+    ],
+    "optional": []
   }}
 }}
 ```
@@ -58,8 +49,8 @@ Act as a Zone-Aware Master Gardener providing comprehensive bulb growing guidanc
 **CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
 • Keep `requirements` values extremely concise (1–3 words or compact ranges). No sentences.
 1. Provide exact planting timing based on soil temperature and frost dates. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
-2. Keep planting guidance in the planting section; care_plan should only cover Grow and Post‑Bloom (post‑plant tasks). Keep 1–3 items per tab
-3. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
+2. Keep planting guidance in the planting section; care_plan should only cover post-plant tasks organized by priority. Keep 1–8 total tasks across all priority levels
+3. Each care_plan item has only: text, when (month/range or relative phrase). Tasks are organized into must_do (essential), good_to_do (recommended), and optional arrays.
 4. Include pre-chilling requirements if needed for this zone
 5. Address zone-specific challenges (drainage in clay soil, heat tolerance, etc.)
 6. Specify naturalization potential and suitable companions

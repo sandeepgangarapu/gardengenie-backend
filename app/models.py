@@ -16,21 +16,56 @@ class PlantIdentificationResponse(BaseModel):
 
 # --- Plant Care Structured Response Models ---
 
+# New priority-based care plan item (no priority field since it's determined by parent array)
 class CarePlanItem(BaseModel):
+    text: str
+    when: Optional[str] = None
+
+# Legacy care plan item (for backward compatibility)
+class LegacyCarePlanItem(BaseModel):
     text: str
     when: Optional[str] = None
     priority: Optional[Literal["must do", "good to do", "optional"]] = None
 
-
+# Legacy tab structure (for backward compatibility)
 class CarePlanTab(BaseModel):
     key: Optional[str] = None
     label: Optional[str] = None
-    items: List[CarePlanItem] = Field(default_factory=list)
+    items: List[LegacyCarePlanItem] = Field(default_factory=list)
 
+# New priority-based care plan structure
+class PriorityBasedCarePlan(BaseModel):
+    must_do: List[CarePlanItem] = Field(default_factory=list)
+    good_to_do: List[CarePlanItem] = Field(default_factory=list)
+    optional: List[CarePlanItem] = Field(default_factory=list)
 
-class CarePlan(BaseModel):
+# Legacy tab-based care plan structure (for backward compatibility)
+class TabBasedCarePlan(BaseModel):
     style: Optional[Literal["seasons", "indoor", "lifecycle"]] = None
     tabs: List[CarePlanTab] = Field(default_factory=list)
+
+# Union type to handle both structures
+class CarePlan(BaseModel):
+    # New priority-based fields
+    must_do: Optional[List[CarePlanItem]] = None
+    good_to_do: Optional[List[CarePlanItem]] = None
+    optional: Optional[List[CarePlanItem]] = None
+    
+    # Legacy tab-based fields (for backward compatibility)
+    style: Optional[Literal["seasons", "indoor", "lifecycle"]] = None
+    tabs: Optional[List[CarePlanTab]] = None
+    
+    def is_priority_based(self) -> bool:
+        """Check if this is the new priority-based structure."""
+        return any([
+            self.must_do is not None,
+            self.good_to_do is not None, 
+            self.optional is not None
+        ])
+    
+    def is_tab_based(self) -> bool:
+        """Check if this is the legacy tab-based structure."""
+        return self.tabs is not None and len(self.tabs) > 0
 
 
 class LegacyCareStep(BaseModel):

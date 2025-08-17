@@ -22,9 +22,9 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
     "water": "[Soak and dry method OR Minimal winter water OR Deep, infrequent]",
     "soil": "[Cactus/succulent mix OR Sandy, well-draining OR Fast-draining]",
     "drainage": "[Excellent drainage critical OR Good drainage OR Tolerates brief moisture]",
-    "temperature": "[Cold hardy to XF OR Minimum 50F OR Heat tolerant]",
+    "temperature": "[Cold tolerance or minimum temperature]",
     "humidity": "[Low humidity preferred OR Tolerates humidity OR Avoid high humidity]",
-    "hardiness": "[Hardy to Zone X OR Tender, container only OR Cold-sensitive]"
+    "hardiness": "[Cold hardiness description]"
   }},
   "seed_starting": [],
   "planting": [
@@ -34,30 +34,13 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
     }}
   ],
   "care_plan": {{
-    "style": "lifecycle",
-    "tabs": [
-      {{
-        "key": "grow",
-        "label": "Grow",
-        "items": [
-          {{ "text": "[Water thoroughly then allow to dry; light feeding]", "when": "[Apr–Sep]", "priority": "must do" }}
-        ]
-      }},
-      {{
-        "key": "dormancy",
-        "label": "Dormancy",
-        "items": [
-          {{ "text": "[Reduce water to monthly or less; protect from cold]", "when": "[Nov–Mar]", "priority": "must do" }}
-        ]
-      }},
-      {{
-        "key": "repot",
-        "label": "Repot/Propagate",
-        "items": [
-          {{ "text": "[Repot every 2–3 years; propagate via cuttings or offsets]", "when": "[Best in spring]", "priority": "good to do" }}
-        ]
-      }}
-    ]
+    "must_do": [
+      {{ "text": "[Essential watering and seasonal care]", "when": "[Season-appropriate timing]" }}
+    ],
+    "good_to_do": [
+      {{ "text": "[Beneficial maintenance tasks]", "when": "[Optimal timing for task]" }}
+    ],
+    "optional": []
   }}
 }}
 ```
@@ -66,7 +49,7 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
 • Keep `requirements` values extremely concise (1–3 words or compact phrases). No sentences.
 1. Address outdoor vs. container growing based on local hardiness conditions. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
 2. Provide specific winter protection needs for this climate
-3. Use lifecycle tabs (Grow, Dormancy, Repot/Propagate). Keep 1–3 concise items per tab (max 8 total)
-4. Each item is only: text, when (month/range or relative phrase), priority (must do|good to do|optional). If a step should be explicitly skipped, use priority "skip".
+3. Organize tasks by priority rather than growth stage. Keep 1–8 total tasks across all priority levels
+4. Each care_plan item has only: text, when (month/range or relative phrase). Tasks are organized into must_do (essential), good_to_do (recommended), and optional arrays.
 5. Address humidity challenges specific to the region and propagation timing
 """
