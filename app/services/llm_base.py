@@ -93,8 +93,9 @@ def validate_and_parse_response(result: Dict[str, Any], required_keys: list, pla
         return None
 
     # Check if JSON response appears to be truncated
-    if not result["content"].rstrip().endswith('}'):
-        logger.warning(f"LLM response appears to be truncated for {plant_type}. Content length: {len(result['content'])}")
+    content_stripped = result["content"].rstrip()
+    if not content_stripped.endswith('}') or not content_stripped.startswith('{'):
+        logger.warning(f"LLM response appears to be truncated or malformed for {plant_type}. Content length: {len(result['content'])}, Content preview: '{content_stripped[:100]}...'")
         return None
 
     try:

@@ -63,7 +63,7 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
         },
     }
 
-    payload = create_payload(prompt, max_tokens=128, temperature=0.0, response_format=classification_schema)
+    payload = create_payload(prompt, max_tokens=256, temperature=0.0, response_format=classification_schema)
     
     # Try up to 3 attempts to mitigate occasional truncation
     for attempt in range(1, 4):
@@ -73,14 +73,15 @@ def classify_plant_group(plant_name: str) -> Optional[Dict[str, str]]:
 
         content = result.get("content", "") or ""
         # If content appears truncated, retry
-        if not content.rstrip().endswith('}'):
-            logger.warning(f"Attempt {attempt}: classification JSON appears truncated. Retrying...")
+        content_stripped = content.rstrip()
+        if not content_stripped.endswith('}') or not content_stripped.startswith('{'):
+            logger.warning(f"Attempt {attempt}: classification JSON appears truncated or malformed. Content: '{content_stripped[:100]}...'. Retrying...")
             continue
 
         try:
             classification = json.loads(content)
         except json.JSONDecodeError as json_e:
-            logger.warning(f"Attempt {attempt}: failed to decode classification JSON: {json_e}. Retrying...")
+            logger.warning(f"Attempt {attempt}: failed to decode classification JSON: {json_e}. Content: '{content[:200]}...'. Retrying...")
             continue
 
         # Basic shape validation
