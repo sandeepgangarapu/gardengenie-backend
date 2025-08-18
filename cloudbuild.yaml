@@ -48,13 +48,13 @@ steps:
       - '--set-env-vars'
       - 'APP_ENV=production'
       - '--update-secrets'
-      - 'SUPABASE_URL=supabase-url:latest'
+      - 'supabase_url=supabase-url:latest'
       - '--update-secrets'
-      - 'SUPABASE_KEY=supabase-key:latest'
+      - 'supabase_key=supabase-key:latest'
       - '--update-secrets'
-      - 'OPENROUTER_API_KEY=openrouter-api-key:latest'
+      - 'openrouter_api_key=openrouter-api-key:latest'
       - '--update-secrets'
-      - 'UNSPLASH_ACCESS_KEY=unsplash-access-key:latest'
+      - 'unsplash_access_key=unsplash-access-key:latest'
 
 # Specify the images to store in Artifact Registry
 images:
