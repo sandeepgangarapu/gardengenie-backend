@@ -75,7 +75,46 @@ class LegacyCareStep(BaseModel):
     timing: Optional[str] = None
 
 
+# --- New 3-Step Plant Care Models ---
+
+class AddPlantInput(BaseModel):
+    plant_name: str = Field(..., min_length=1, description="The user-provided plant name (e.g., tomato, Fiddle Leaf Fig).")
+    user_zone: str = Field(..., pattern=r"^\d{1,2}[ab]?$", description="The user's USDA Hardiness Zone (e.g., 7a, 8b, 5).")
+    persist: bool = Field(default=True, description="Whether to store the plant info in Supabase. Defaults to True.")
+
+class PlantBasicInfoResponse(BaseModel):
+    plant_id: Optional[str] = Field(None, description="UUID of the plant in database")
+    plantName: str
+    description: Optional[str] = None
+    type: Optional[str] = None
+    seasonality: Optional[str] = None
+    zoneSuitability: Optional[str] = None
+    plant_group: Optional[str] = None
+    requirements: Optional[Dict[str, Any]] = None
+    
+    class Config:
+        extra = "allow"
+
+class PlantPlantingResponse(BaseModel):
+    plant_id: str = Field(..., description="UUID of the plant in database")
+    seedStartingMonth: Optional[str] = None
+    plantingMonth: Optional[str] = None
+    seed_starting: Optional[List[Dict[str, str]]] = None
+    planting: Optional[List[Dict[str, str]]] = None
+    
+    class Config:
+        extra = "allow"
+
 class PlantCareResponse(BaseModel):
+    plant_id: str = Field(..., description="UUID of the plant in database")
+    care_plan: Optional[CarePlan] = None
+    
+    class Config:
+        extra = "allow"
+
+# --- Legacy Full Plant Care Response (for backward compatibility) ---
+
+class PlantCareFullResponse(BaseModel):
     # Core
     plantName: str
     description: Optional[str] = None

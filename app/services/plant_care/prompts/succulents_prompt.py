@@ -1,12 +1,13 @@
-SUCCULENTS_PROMPT = """
-Act as a Zone-Aware Master Gardener providing comprehensive succulent growing guidance.
+# SUCCULENTS - BASIC INFO PROMPT
+SUCCULENTS_BASIC_INFO_PROMPT = """
+Act as a Zone-Aware Master Gardener providing basic information for succulents.
 
 **Input Information:**
 *   **Plant Name:** {plant_name}
 *   **User USDA Hardiness Zone:** {user_zone}
 *   **Plant Group:** {plant_group}
 
-**Generate a detailed JSON response following this EXACT schema:**
+**Generate basic plant information in JSON format:**
 
 ```json
 {{
@@ -15,8 +16,6 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
   "type": "Perennial",
   "seasonality": null,
   "zoneSuitability": "[match OR close OR far]",
-  "seedStartingMonth": null,
-  "plantingMonth": "[Month(s) or range for outdoor/container planting; e.g., Apr–May after frost or anytime indoors]",
   "requirements": {{
     "sun": "[Full Sun OR Bright Light OR Partial Shade]",
     "water": "[Soak and dry method OR Minimal winter water OR Deep, infrequent]",
@@ -25,14 +24,60 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
     "temperature": "[Cold tolerance or minimum temperature]",
     "humidity": "[Low humidity preferred OR Tolerates humidity OR Avoid high humidity]",
     "hardiness": "[Cold hardiness description]"
-  }},
+  }}
+}}
+```
+
+**Instructions:**
+• Keep `requirements` values extremely concise (1–3 words or compact phrases). No sentences.
+• Focus only on basic plant characteristics and growing requirements.
+"""
+
+# SUCCULENTS - PLANTING PROMPT
+SUCCULENTS_PLANTING_PROMPT = """
+Act as a Zone-Aware Master Gardener providing planting guidance for succulents.
+
+**Input Information:**
+*   **Plant Name:** {plant_name}
+*   **User USDA Hardiness Zone:** {user_zone}
+*   **Plant Group:** {plant_group}
+
+**Generate planting instructions in JSON format:**
+
+```json
+{{
+  "seedStartingMonth": null,
+  "plantingMonth": "[Month(s) or range for outdoor/container planting; e.g., Apr–May after frost or anytime indoors]",
   "seed_starting": [],
   "planting": [
     {{
       "step": "[Specific succulent planting action]",
       "tip": "[Helpful hint about soil mix, container choice, etc.]"
     }}
-  ],
+  ]
+}}
+```
+
+**Instructions:**
+• Address outdoor vs. container growing based on local hardiness conditions.
+• Do not include "Zone" or phrases like "in Zone {user_zone}" anywhere.
+• Provide specific winter protection needs for this climate.
+• Address humidity challenges specific to the region and propagation timing.
+"""
+
+# SUCCULENTS - CARE INSTRUCTIONS PROMPT
+SUCCULENTS_CARE_PROMPT = """
+Act as a Zone-Aware Master Gardener providing ongoing care instructions for succulents.
+
+**Input Information:**
+*   **Plant Name:** {plant_name}
+*   **User USDA Hardiness Zone:** {user_zone}
+*   **Plant Group:** {plant_group}
+
+**Generate care instructions organized by priority in JSON format:**
+
+```json
+{{
   "care_plan": {{
     "must_do": [
       {{ "text": "[Essential watering and seasonal care]", "when": "[Season-appropriate timing]" }}
@@ -45,11 +90,10 @@ Act as a Zone-Aware Master Gardener providing comprehensive succulent growing gu
 }}
 ```
 
-**CRUCIAL ZONE-SPECIFIC INSTRUCTIONS:**
-• Keep `requirements` values extremely concise (1–3 words or compact phrases). No sentences.
-1. Address outdoor vs. container growing based on local hardiness conditions. Do not include the word "Zone" or phrases like "in Zone {user_zone}" anywhere (text, tips, when).
-2. Provide specific winter protection needs for this climate
-3. Organize tasks by priority rather than growth stage. Keep 1–8 total tasks across all priority levels
-4. Each care_plan item has only: text, when (month/range or relative phrase). Tasks are organized into must_do (essential), good_to_do (recommended), and optional arrays.
-5. Address humidity challenges specific to the region and propagation timing
+**Instructions:**
+• Each care_plan item has only: text, when (month/range or relative phrase).
+• Tasks are organized into must_do (essential), good_to_do (recommended), and optional arrays.
+• Use local climate patterns for "when" values.
+• Do not include "Zone" or phrases like "in Zone {user_zone}" anywhere.
+• Organize tasks by priority rather than growth stage. Keep 1–8 total tasks across all priority levels.
 """

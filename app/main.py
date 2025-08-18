@@ -7,10 +7,16 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import JSONResponse
 
 from .config import APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS, MAX_UPLOAD_MB
-from .models import PlantCareInput, PlantIdentificationResponse, PlantCareResponse
-from .services.plant_care.plant_care import generate_plant_care_instructions, fetch_and_store_image_for_plant
+from .models import (
+    PlantCareInput, PlantIdentificationResponse, PlantCareFullResponse,
+    AddPlantInput, PlantBasicInfoResponse, PlantPlantingResponse, PlantCareResponse
+)
+from .services.plant_care.plant_care import (
+    generate_plant_care_instructions, fetch_and_store_image_for_plant,
+    generate_plant_basic_info, generate_plant_planting_info, generate_plant_care_info
+)
 from .services.plant_identification.plant_identification import identify_plant_from_uploaded_image, validate_image_data
-from .database.supabase_client import health_check, get_supabase_client
+from .database.supabase_client import health_check, get_supabase_client, get_plant_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +66,7 @@ app.add_middleware(RequestSizeLimitMiddleware, max_upload_mb=MAX_UPLOAD_MB)
 
 # --- API Endpoints ---
 
-@app.post("/plant-care-instructions", response_model=PlantCareResponse)
+@app.post("/plant-care-instructions", response_model=PlantCareFullResponse)
 async def get_plant_care_instructions(payload: PlantCareInput, request: Request, background_tasks: BackgroundTasks):
     """
     Receives a plant name and USDA zone, classifies the plant care category,
@@ -159,6 +165,133 @@ async def identify_plant(file: UploadFile = File(...)):
     
     logger.info(f"Plant identification completed: {response.is_plant}, {response.common_name}")
     return response
+
+# --- New 3-Step Plant Care Endpoints ---
+
+@app.post("/add-plant", response_model=PlantBasicInfoResponse)
+async def add_plant(payload: AddPlantInput, request: Request, background_tasks: BackgroundTasks):
+    """
+    Step 1: Add a plant and get basic information.
+    Classifies the plant and generates basic info (name, description, requirements).
+    """
+    supabase_client = get_supabase_client()
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Database client is not initialized. Cannot process request.")
+
+    plant_name = payload.plant_name
+    user_zone = payload.user_zone
+    logger.info(f"Received add plant request: '{plant_name}' in zone '{user_zone}'")
+
+    # Generate basic plant info using the service (offload to threadpool)
+    basic_info = await run_in_threadpool(
+        generate_plant_basic_info,
+        plant_name,
+        user_zone,
+        payload.persist,
+    )
+    
+    # If the input was determined not to be a plant, return a clear 400
+    if isinstance(basic_info, dict) and basic_info.get("__non_plant"):
+        raise HTTPException(status_code=400, detail=basic_info.get("message", "Input does not appear to be a plant."))
+
+    if basic_info is None:
+        raise HTTPException(status_code=503, detail="Error generating basic plant information.")
+
+    logger.info(f"Successfully generated basic info for '{plant_name}'")
+
+    # Kick off background image fetch/store using possibly corrected name
+    corrected_plant_name = basic_info.get('plantName', plant_name)
+    background_tasks.add_task(fetch_and_store_image_for_plant, corrected_plant_name)
+
+    return basic_info
+
+@app.post("/plant-planting/{plant_id}", response_model=PlantPlantingResponse)
+async def get_plant_planting_instructions(plant_id: str, request: Request):
+    """
+    Step 2: Get planting instructions for an existing plant.
+    Requires plant_id from Step 1.
+    """
+    supabase_client = get_supabase_client()
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Database client is not initialized. Cannot process request.")
+
+    logger.info(f"Received planting instructions request for plant_id: '{plant_id}'")
+
+    # Get plant data from database
+    plant_data = get_plant_by_id(plant_id)
+    if plant_data is None:
+        raise HTTPException(status_code=404, detail=f"Plant with ID '{plant_id}' not found.")
+    
+    plant_name = plant_data.get('plant_name')
+    user_zone = plant_data.get('zone')
+    plant_group = plant_data.get('plant_group')
+    
+    # Map plant group to prompt function
+    from .services.plant_care.plant_classifier import CATEGORY_TO_PROMPT
+    prompt_function = CATEGORY_TO_PROMPT.get(plant_group)
+    if not prompt_function:
+        raise HTTPException(status_code=400, detail=f"No prompt function found for plant group: {plant_group}")
+
+    # Generate planting instructions using the service (offload to threadpool)
+    planting_info = await run_in_threadpool(
+        generate_plant_planting_info,
+        plant_id,
+        plant_name,
+        user_zone,
+        plant_group,
+        prompt_function,
+        True,  # persist_to_db
+    )
+
+    if planting_info is None:
+        raise HTTPException(status_code=503, detail="Error generating planting instructions.")
+
+    logger.info(f"Successfully generated planting instructions for plant_id: '{plant_id}'")
+    return planting_info
+
+@app.post("/plant-care/{plant_id}", response_model=PlantCareResponse)
+async def get_plant_care_instructions(plant_id: str, request: Request):
+    """
+    Step 3: Get care instructions for an existing plant.
+    Requires plant_id from Step 1.
+    """
+    supabase_client = get_supabase_client()
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Database client is not initialized. Cannot process request.")
+
+    logger.info(f"Received care instructions request for plant_id: '{plant_id}'")
+
+    # Get plant data from database
+    plant_data = get_plant_by_id(plant_id)
+    if plant_data is None:
+        raise HTTPException(status_code=404, detail=f"Plant with ID '{plant_id}' not found.")
+    
+    plant_name = plant_data.get('plant_name')
+    user_zone = plant_data.get('zone')
+    plant_group = plant_data.get('plant_group')
+    
+    # Map plant group to prompt function
+    from .services.plant_care.plant_classifier import CATEGORY_TO_PROMPT
+    prompt_function = CATEGORY_TO_PROMPT.get(plant_group)
+    if not prompt_function:
+        raise HTTPException(status_code=400, detail=f"No prompt function found for plant group: {plant_group}")
+
+    # Generate care instructions using the service (offload to threadpool)
+    care_info = await run_in_threadpool(
+        generate_plant_care_info,
+        plant_id,
+        plant_name,
+        user_zone,
+        plant_group,
+        prompt_function,
+        True,  # persist_to_db
+    )
+
+    if care_info is None:
+        raise HTTPException(status_code=503, detail="Error generating care instructions.")
+
+    logger.info(f"Successfully generated care instructions for plant_id: '{plant_id}'")
+    return care_info
 
 @app.get("/health", status_code=200)
 async def health_check_endpoint():
