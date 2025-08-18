@@ -1,0 +1,62 @@
+# .gcloudignore - Exclude files from Google Cloud builds
+# This file works like .gitignore but for Google Cloud Build
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+
+# Environment files
+.env
+.env.*
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Logs
+*.log
+server.log
+
+# Documentation and development files
+README.md
+CLAUDE.md
+*.md
+
+# Test files
+test_*
+*_test.py
+tests/
+
+# Development images
+*.jpg
+*.png
+*.gif
+tomato.jpg
+
+# Build artifacts
+dist/
+build/
+
+# GitHub
+.github/
+
+# Node.js (if any)
+node_modules/
+npm-debug.log
+
+# MCP
+.mcp.json

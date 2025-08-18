@@ -1,0 +1,70 @@
+# Google Cloud Build configuration for Garden Genie Backend
+# This file defines the build steps for automated deployment to Cloud Run
+
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:latest'
+      - '.'
+    
+  # Push the Docker image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$COMMIT_SHA'
+      
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'gardengenie-backend'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--set-env-vars'
+      - 'APP_ENV=production'
+      - '--update-secrets'
+      - 'SUPABASE_URL=supabase-url:latest'
+      - '--update-secrets'
+      - 'SUPABASE_KEY=supabase-key:latest'
+      - '--update-secrets'
+      - 'OPENROUTER_API_KEY=openrouter-api-key:latest'
+      - '--update-secrets'
+      - 'UNSPLASH_ACCESS_KEY=unsplash-access-key:latest'
+
+# Specify the images to store in Artifact Registry
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:latest'
+
+# Build configuration
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+# Timeout for the entire build (30 minutes)
+timeout: '1800s'

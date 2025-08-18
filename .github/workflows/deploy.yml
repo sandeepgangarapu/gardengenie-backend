@@ -1,0 +1,96 @@
+# GitHub Actions workflow for automated deployment to Google Cloud Run
+# Triggers on push to main branch and manual dispatch
+
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  SERVICE_NAME: gardengenie-backend
+  REGION: us-central1
+
+jobs:
+  # Lint and test job (runs for all triggers)
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+
+    - name: Run basic health check
+      run: |
+        # Basic syntax check
+        python -m py_compile app/main.py
+        echo "✅ Syntax check passed"
+
+  # Deploy job (only runs on main/master branch push or manual dispatch)
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
+
+    - name: Configure Docker to use gcloud as a credential helper
+      run: |
+        gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    - name: Build and push Docker image
+      run: |
+        # Build image with both commit SHA and latest tags
+        docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$GITHUB_SHA .
+        docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:latest .
+        
+        # Push both tags
+        docker push us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$GITHUB_SHA
+        docker push us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:latest
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy $SERVICE_NAME \
+          --image us-central1-docker.pkg.dev/$PROJECT_ID/gardengenie-repo/gardengenie-backend:$GITHUB_SHA \
+          --region $REGION \
+          --platform managed \
+          --allow-unauthenticated \
+          --port 8080 \
+          --memory 1Gi \
+          --cpu 1 \
+          --max-instances 10 \
+          --set-env-vars APP_ENV=production \
+          --update-secrets SUPABASE_URL=supabase-url:latest \
+          --update-secrets SUPABASE_KEY=supabase-key:latest \
+          --update-secrets OPENROUTER_API_KEY=openrouter-api-key:latest \
+          --update-secrets UNSPLASH_ACCESS_KEY=unsplash-access-key:latest
+
+    - name: Get service URL
+      run: |
+        SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --format='value(status.url)')
+        echo "🚀 Service deployed at: $SERVICE_URL"
+        echo "📚 API Documentation: $SERVICE_URL/docs"
+        echo "❤️ Health Check: $SERVICE_URL/health"
