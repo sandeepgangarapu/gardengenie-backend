@@ -269,7 +269,6 @@ def store_plant_and_care_instructions(
     original_plant_name: str,
     original_user_zone: str,
     care_info: dict,
-    model_used: str,
     plant_group: str = None
 ) -> bool:
     """
@@ -357,8 +356,6 @@ def store_plant_and_care_instructions(
         'seed_starting': seed_starting_json,
         'planting': planting_json,
         'care_plan': care_plan_json,
-        # Model used for generation
-        'model_used': model_used,
         # Full raw LLM response for traceability
         'raw_llm_response': raw_llm_response_json,
     }
@@ -814,6 +811,325 @@ def store_plant_and_care_instructions(
     except Exception as e:
         logger.error(f"An unexpected error occurred during Supabase plant/care storage: {e}", exc_info=True)
         return False
+
+# --- New 3-Step Plant Storage Functions ---
+
+def store_plant_basic_info(
+    original_plant_name: str,
+    original_user_zone: str,
+    basic_info: dict,
+    plant_group: str
+) -> Optional[str]:
+    """
+    Store basic plant information (Step 1 of 3-step process).
+    Returns plant_id if successful, None otherwise.
+    """
+    client = get_supabase_client()
+    if client is None:
+        logger.error("Supabase client is not initialized. Cannot store basic info.")
+        return None
+
+    if not isinstance(basic_info, dict):
+        logger.error("Invalid basic_info type passed to store_plant_basic_info. Expected dict.")
+        return None
+
+    # Extract data from basic_info
+    plant_name = basic_info.get('plantName')
+    description = basic_info.get('description')
+    plant_type = basic_info.get('type')
+    seasonality = basic_info.get('seasonality')
+    zone_suitability = basic_info.get('zoneSuitability')
+    requirements_json = basic_info.get('requirements')
+
+    # Zone persistence policy
+    zone_for_persistence = None if plant_group in ['Houseplants', 'Succulents'] else original_user_zone
+
+    # Prepare plant data
+    plant_data = {
+        'plant_name': plant_name,
+        'zone': zone_for_persistence,
+        'description': description,
+        'type': plant_type,
+        'seasonality': seasonality,
+        'zone_suitability': zone_suitability,
+        'plant_group': plant_group,
+        'requirements': requirements_json,
+    }
+
+    try:
+        # Check if plant already exists
+        if plant_group in ['Houseplants', 'Succulents']:
+            # For houseplants/succulents, look by name and group only
+            find_response: APIResponse = client.table('plants')\
+                                               .select('plant_id')\
+                                               .eq('plant_name', plant_name)\
+                                               .eq('plant_group', plant_group)\
+                                               .is_('zone', 'null')\
+                                               .limit(1)\
+                                               .execute()
+        else:
+            # For other plants, look by name and zone
+            find_response: APIResponse = client.table('plants')\
+                                               .select('plant_id')\
+                                               .eq('plant_name', plant_name)\
+                                               .eq('zone', zone_for_persistence)\
+                                               .limit(1)\
+                                               .execute()
+
+        if find_response is None:
+            logger.error("Supabase query execution returned None.")
+            return None
+
+        if find_response.data:
+            # Plant exists, update it
+            existing_plant_id = find_response.data[0].get('plant_id')
+            logger.info(f"Updating existing plant: {plant_name} (ID: {existing_plant_id})")
+            
+            update_response: APIResponse = client.table('plants')\
+                                                 .update(plant_data)\
+                                                 .eq('plant_id', existing_plant_id)\
+                                                 .execute()
+            
+            if update_response is None or not update_response.data:
+                logger.error(f"Failed to update plant basic info. Response: {update_response!r}")
+                return None
+                
+            return existing_plant_id
+        else:
+            # Plant doesn't exist, insert it
+            logger.info(f"Inserting new plant: {plant_name}")
+            insert_response: APIResponse = client.table('plants')\
+                                                 .insert(plant_data)\
+                                                 .execute()
+
+            if insert_response is None or not insert_response.data:
+                logger.error(f"Failed to insert new plant. Response: {insert_response!r}")
+                return None
+
+            plant_id = insert_response.data[0].get('plant_id')
+            logger.info(f"Inserted new plant with UUID: {plant_id}")
+            return plant_id
+
+    except APIError as api_e:
+        logger.error(f"Supabase API Error during basic info storage: {api_e.message}", exc_info=True)
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during basic info storage: {e}", exc_info=True)
+        return None
+
+def store_plant_planting_info(plant_id: str, planting_info: dict) -> bool:
+    """
+    Store planting information for an existing plant (Step 2 of 3-step process).
+    Returns True if successful, False otherwise.
+    """
+    client = get_supabase_client()
+    if client is None:
+        logger.error("Supabase client is not initialized. Cannot store planting info.")
+        return False
+
+    if not isinstance(planting_info, dict):
+        logger.error("Invalid planting_info type. Expected dict.")
+        return False
+
+    # Extract planting data
+    seed_starting_month = planting_info.get('seedStartingMonth')
+    planting_month = planting_info.get('plantingMonth')
+    seed_starting_json = planting_info.get('seed_starting')
+    planting_json = planting_info.get('planting')
+
+    # Update plant with planting information
+    planting_data = {
+        'seed_starting_month': seed_starting_month,
+        'planting_month': planting_month,
+        'seed_starting': seed_starting_json,
+        'planting': planting_json,
+    }
+
+    try:
+        update_response: APIResponse = client.table('plants')\
+                                             .update(planting_data)\
+                                             .eq('plant_id', plant_id)\
+                                             .execute()
+
+        if update_response is None or not update_response.data:
+            logger.error(f"Failed to update plant planting info for plant_id: {plant_id}")
+            return False
+
+        logger.info(f"Successfully updated planting info for plant_id: {plant_id}")
+        return True
+
+    except APIError as api_e:
+        logger.error(f"Supabase API Error during planting info storage: {api_e.message}", exc_info=True)
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error during planting info storage: {e}", exc_info=True)
+        return False
+
+def store_plant_care_info(plant_id: str, care_info: dict) -> bool:
+    """
+    Store care information for an existing plant (Step 3 of 3-step process).
+    Updates both plants table and care_instructions table.
+    Returns True if successful, False otherwise.
+    """
+    client = get_supabase_client()
+    if client is None:
+        logger.error("Supabase client is not initialized. Cannot store care info.")
+        return False
+
+    if not isinstance(care_info, dict):
+        logger.error("Invalid care_info type. Expected dict.")
+        return False
+
+    # Extract care data
+    care_plan_json = care_info.get('care_plan')
+
+    try:
+        # Step 1: Update plant with care information
+        care_data = {
+            'care_plan': care_plan_json,
+        }
+
+        update_response: APIResponse = client.table('plants')\
+                                             .update(care_data)\
+                                             .eq('plant_id', plant_id)\
+                                             .execute()
+
+        if update_response is None or not update_response.data:
+            logger.error(f"Failed to update plant care info for plant_id: {plant_id}")
+            return False
+
+        # Step 2: Delete old care instructions for this plant
+        logger.debug(f"Deleting old care instructions for plant_id: {plant_id}")
+        delete_response: APIResponse = client.table('care_instructions')\
+                                            .delete()\
+                                            .eq('plant_id', plant_id)\
+                                            .execute()
+        if delete_response is None:
+            logger.warning("Supabase delete execution returned None. Cannot confirm deletion of old care instructions.")
+
+        # Step 3: Prepare and insert new care instructions based on care_plan
+        care_instructions_to_insert = []
+        skipped_instructions = 0
+
+        if care_plan_json and isinstance(care_plan_json, dict):
+            # Process the new priority-based structure
+            has_priority_fields = any([
+                'must_do' in care_plan_json,
+                'good_to_do' in care_plan_json, 
+                'optional' in care_plan_json
+            ])
+            
+            if has_priority_fields:
+                logger.info(f"Processing priority-based care plan structure for plant_id: {plant_id}")
+                
+                priority_levels = [
+                    ('must_do', 'must do', 'Must Do'),
+                    ('good_to_do', 'good to do', 'Good To Do'), 
+                    ('optional', 'optional', 'Optional')
+                ]
+                
+                for field_name, priority_value, care_phase_name in priority_levels:
+                    items = care_plan_json.get(field_name, [])
+                    if not isinstance(items, list):
+                        logger.warning(f"care_plan.{field_name} is not a list for plant_id: {plant_id}. Skipping.")
+                        skipped_instructions += 1
+                        continue
+                        
+                    for i, item in enumerate(items):
+                        if not isinstance(item, dict):
+                            logger.warning(f"care_plan.{field_name}[{i}] is not a dict for plant_id: {plant_id}. Skipping.")
+                            skipped_instructions += 1
+                            continue
+                            
+                        text_value = item.get('text')
+                        if not text_value or not isinstance(text_value, str) or not text_value.strip():
+                            logger.warning(f"care_plan.{field_name}[{i}] missing or empty text for plant_id: {plant_id}. Skipping.")
+                            skipped_instructions += 1
+                            continue
+                            
+                        instruction_row = {
+                            'plant_id': plant_id,
+                            'care_phase': care_phase_name,
+                            'months': item.get('when'),
+                            'step_description': text_value.strip(),
+                            'priority': priority_value,
+                            'order_within_season': i + 1,
+                        }
+                        care_instructions_to_insert.append(instruction_row)
+            else:
+                logger.warning(f"Unknown care_plan structure for plant_id: {plant_id}: {list(care_plan_json.keys())}")
+                skipped_instructions += 1
+
+        # Log any skipped instructions
+        if skipped_instructions > 0:
+            logger.warning(f"Skipped {skipped_instructions} invalid care instructions for plant_id: {plant_id}")
+
+        # Step 4: Insert new care instructions
+        if not care_instructions_to_insert:
+            if skipped_instructions > 0:
+                logger.error(f"All care instructions were invalid for plant_id: {plant_id}. No instructions to insert.")
+                return False
+            else:
+                logger.info("No care instructions generated to insert.")
+                return True
+        else:
+            logger.info(f"Inserting {len(care_instructions_to_insert)} care instructions for plant_id: {plant_id}")
+            insert_care_response: APIResponse = client.table('care_instructions')\
+                                                    .insert(care_instructions_to_insert)\
+                                                    .execute()
+
+            if insert_care_response is None:
+                logger.error("Supabase care instructions insert execution returned None.")
+                return False
+
+            if not insert_care_response.data or len(insert_care_response.data) != len(care_instructions_to_insert):
+                logger.error(f"Failed to insert all care instructions. Response: {insert_care_response!r}")
+                return False
+            else:
+                logger.info(f"Successfully stored {len(care_instructions_to_insert)} care instructions.")
+                logger.info(f"Successfully updated care info for plant_id: {plant_id}")
+                return True
+
+    except APIError as api_e:
+        logger.error(f"Supabase API Error during care info storage: {api_e.message}", exc_info=True)
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error during care info storage: {e}", exc_info=True)
+        return False
+
+def get_plant_by_id(plant_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve plant information by plant_id.
+    Returns plant data if found, None otherwise.
+    """
+    client = get_supabase_client()
+    if client is None:
+        logger.error("Supabase client is not initialized. Cannot retrieve plant.")
+        return None
+
+    try:
+        response: APIResponse = client.table('plants')\
+                                      .select('*')\
+                                      .eq('plant_id', plant_id)\
+                                      .limit(1)\
+                                      .execute()
+
+        if response is None:
+            logger.error("Supabase query execution returned None.")
+            return None
+
+        if response.data:
+            return response.data[0]
+        else:
+            logger.warning(f"No plant found with plant_id: {plant_id}")
+            return None
+
+    except APIError as api_e:
+        logger.error(f"Supabase API Error during plant retrieval: {api_e.message}", exc_info=True)
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during plant retrieval: {e}", exc_info=True)
+        return None
 
 def health_check() -> Dict[str, Any]:
     """Check Supabase connection health."""

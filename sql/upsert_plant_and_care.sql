@@ -31,13 +31,13 @@ begin
         seed_starting_month, planting_month, seed_starting_instructions,
         planting_instructions, zone_suitability, seasonality, plant_group,
         requirements, seed_starting, planting, care_plan,
-        model_used, raw_llm_response
+        raw_llm_response
       ) values (
         plant->>'plant_name', null, plant->>'description', plant->>'type', plant->>'sun_requirements',
         plant->>'seed_starting_month', plant->>'planting_month', plant->'seed_starting_instructions',
         plant->'planting_instructions', plant->>'zone_suitability', plant->>'seasonality', plant->>'plant_group',
         plant->'requirements', plant->'seed_starting', plant->'planting', plant->'care_plan',
-        plant->>'model_used', plant->'raw_llm_response'
+        plant->'raw_llm_response'
       ) returning plant_id into v_plant_id;
     else
       update public.plants set
@@ -55,7 +55,7 @@ begin
         seed_starting = plant->'seed_starting',
         planting = plant->'planting',
         care_plan = plant->'care_plan',
-        model_used = plant->>'model_used',
+
         raw_llm_response = plant->'raw_llm_response'
       where plant_id = v_plant_id;
     end if;
@@ -71,13 +71,13 @@ begin
         seed_starting_month, planting_month, seed_starting_instructions,
         planting_instructions, zone_suitability, seasonality, plant_group,
         requirements, seed_starting, planting, care_plan,
-        model_used, raw_llm_response
+        raw_llm_response
       ) values (
         plant->>'plant_name', v_zone, plant->>'description', plant->>'type', plant->>'sun_requirements',
         plant->>'seed_starting_month', plant->>'planting_month', plant->'seed_starting_instructions',
         plant->'planting_instructions', plant->>'zone_suitability', plant->>'seasonality', plant->>'plant_group',
         plant->'requirements', plant->'seed_starting', plant->'planting', plant->'care_plan',
-        plant->>'model_used', plant->'raw_llm_response'
+        plant->'raw_llm_response'
       ) returning plant_id into v_plant_id;
     else
       update public.plants set
@@ -95,7 +95,7 @@ begin
         seed_starting = plant->'seed_starting',
         planting = plant->'planting',
         care_plan = plant->'care_plan',
-        model_used = plant->>'model_used',
+
         raw_llm_response = plant->'raw_llm_response'
       where plant_id = v_plant_id;
     end if;
