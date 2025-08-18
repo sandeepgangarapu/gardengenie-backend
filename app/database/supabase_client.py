@@ -296,6 +296,16 @@ def store_plant_and_care_instructions(
     )
     seed_start_month = care_info.get('seedStartingMonth')
     plant_month = care_info.get('plantingMonth')
+    
+    # Truncate month fields to fit database constraints (varchar(50))
+    if seed_start_month and len(seed_start_month) > 50:
+        logger.warning(f"Truncating seedStartingMonth from {len(seed_start_month)} to 50 characters: '{seed_start_month}'")
+        seed_start_month = seed_start_month[:50]
+    
+    if plant_month and len(plant_month) > 50:
+        logger.warning(f"Truncating plantingMonth from {len(plant_month)} to 50 characters: '{plant_month}'")
+        plant_month = plant_month[:50]
+    
     seed_instructions = care_info.get('seedStartingInstructions') or []
     plant_instructions = care_info.get('plantingInstructions') or []
     care_details = care_info.get('care', {})
@@ -936,6 +946,15 @@ def store_plant_planting_info(plant_id: str, planting_info: dict) -> bool:
     planting_month = planting_info.get('plantingMonth')
     seed_starting_json = planting_info.get('seed_starting')
     planting_json = planting_info.get('planting')
+
+    # Truncate month fields to fit database constraints (varchar(50))
+    if seed_starting_month and len(seed_starting_month) > 50:
+        logger.warning(f"Truncating seed_starting_month from {len(seed_starting_month)} to 50 characters: '{seed_starting_month}'")
+        seed_starting_month = seed_starting_month[:50]
+    
+    if planting_month and len(planting_month) > 50:
+        logger.warning(f"Truncating planting_month from {len(planting_month)} to 50 characters: '{planting_month}'")
+        planting_month = planting_month[:50]
 
     # Update plant with planting information
     planting_data = {
