@@ -96,6 +96,7 @@ def validate_and_parse_response(result: Dict[str, Any], required_keys: list, pla
     content_stripped = result["content"].rstrip()
     if not content_stripped.endswith('}') or not content_stripped.startswith('{'):
         logger.warning(f"LLM response appears to be truncated or malformed for {plant_type}. Content length: {len(result['content'])}, Content preview: '{content_stripped[:100]}...'")
+        logger.debug(f"Full truncated content for {plant_type}: {result['content']}")
         return None
 
     try:

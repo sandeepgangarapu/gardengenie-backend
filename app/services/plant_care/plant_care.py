@@ -57,7 +57,7 @@ HUMAN_FRIENDLY_GROUP = {
 }
 
 def call_basic_info_prompt(group_key: str, plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Call the basic info prompt for a plant group."""
+    """Call the basic info prompt for a plant group with retry logic for truncated responses."""
     if group_key == "houseplants":
         prompt = HOUSEPLANTS_BASIC_INFO_PROMPT.format(plant_name=plant_name)
     elif group_key == "edible_annuals":
@@ -76,12 +76,39 @@ def call_basic_info_prompt(group_key: str, plant_name: str, user_zone: str, plan
         logger.error(f"Unknown prompt group: {group_key}")
         return None
 
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['plantName', 'requirements'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
+    # Use higher max_tokens for basic info prompts to reduce truncation risk
+    payload = create_payload(prompt, max_tokens=3500)
+    
+    # Try up to 3 attempts to mitigate occasional truncation
+    for attempt in range(1, 4):
+        result = make_llm_request(payload)
+        if not result:
+            continue
+
+        # Validate response with retry logic
+        parsed_result = validate_and_parse_response(result, ['plantName', 'requirements'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
+        
+        if parsed_result is not None:
+            # Success - return the parsed result
+            return parsed_result
+        
+        # If validation failed, check if it was due to truncation
+        content = result.get("content", "") or ""
+        content_stripped = content.rstrip()
+        if not content_stripped.endswith('}') or not content_stripped.startswith('{'):
+            logger.warning(f"Attempt {attempt}: Basic info prompt response appears truncated for {group_key} '{plant_name}'. Content length: {len(content)}. Retrying...")
+            continue
+        else:
+            # Not a truncation issue, some other parsing problem - don't retry
+            logger.error(f"Basic info prompt validation failed for non-truncation reason for {group_key} '{plant_name}'. Stopping retries.")
+            break
+    
+    # All attempts failed
+    logger.error(f"Failed to generate valid basic info response for {group_key} '{plant_name}' after 3 attempts")
+    return None
 
 def call_planting_prompt(group_key: str, plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Call the planting prompt for a plant group."""
+    """Call the planting prompt for a plant group with retry logic for truncated responses."""
     if group_key == "houseplants":
         prompt = HOUSEPLANTS_PLANTING_PROMPT.format(plant_name=plant_name)
     elif group_key == "edible_annuals":
@@ -100,12 +127,39 @@ def call_planting_prompt(group_key: str, plant_name: str, user_zone: str, plant_
         logger.error(f"Unknown prompt group: {group_key}")
         return None
 
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['seedStartingMonth', 'plantingMonth'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
+    # Use higher max_tokens for planting prompts to reduce truncation risk
+    payload = create_payload(prompt, max_tokens=4000)
+    
+    # Try up to 3 attempts to mitigate occasional truncation
+    for attempt in range(1, 4):
+        result = make_llm_request(payload)
+        if not result:
+            continue
+
+        # Validate response with retry logic
+        parsed_result = validate_and_parse_response(result, ['seedStartingMonth', 'plantingMonth'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
+        
+        if parsed_result is not None:
+            # Success - return the parsed result
+            return parsed_result
+        
+        # If validation failed, check if it was due to truncation
+        content = result.get("content", "") or ""
+        content_stripped = content.rstrip()
+        if not content_stripped.endswith('}') or not content_stripped.startswith('{'):
+            logger.warning(f"Attempt {attempt}: Planting prompt response appears truncated for {group_key} '{plant_name}'. Content length: {len(content)}. Retrying...")
+            continue
+        else:
+            # Not a truncation issue, some other parsing problem - don't retry
+            logger.error(f"Planting prompt validation failed for non-truncation reason for {group_key} '{plant_name}'. Stopping retries.")
+            break
+    
+    # All attempts failed
+    logger.error(f"Failed to generate valid planting response for {group_key} '{plant_name}' after 3 attempts")
+    return None
 
 def call_care_prompt(group_key: str, plant_name: str, user_zone: str, plant_group: str) -> Optional[Dict[str, Any]]:
-    """Call the care prompt for a plant group."""
+    """Call the care prompt for a plant group with retry logic for truncated responses."""
     if group_key == "houseplants":
         prompt = HOUSEPLANTS_CARE_PROMPT.format(plant_name=plant_name)
     elif group_key == "edible_annuals":
@@ -124,9 +178,36 @@ def call_care_prompt(group_key: str, plant_name: str, user_zone: str, plant_grou
         logger.error(f"Unknown prompt group: {group_key}")
         return None
 
-    payload = create_payload(prompt)
-    result = make_llm_request(payload)
-    return validate_and_parse_response(result, ['care_plan'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
+    # Use higher max_tokens for care prompts to reduce truncation risk
+    payload = create_payload(prompt, max_tokens=4500)
+    
+    # Try up to 3 attempts to mitigate occasional truncation
+    for attempt in range(1, 4):
+        result = make_llm_request(payload)
+        if not result:
+            continue
+
+        # Validate response with retry logic
+        parsed_result = validate_and_parse_response(result, ['care_plan'], HUMAN_FRIENDLY_GROUP.get(group_key, group_key), plant_name)
+        
+        if parsed_result is not None:
+            # Success - return the parsed result
+            return parsed_result
+        
+        # If validation failed, check if it was due to truncation
+        content = result.get("content", "") or ""
+        content_stripped = content.rstrip()
+        if not content_stripped.endswith('}') or not content_stripped.startswith('{'):
+            logger.warning(f"Attempt {attempt}: Care prompt response appears truncated for {group_key} '{plant_name}'. Content length: {len(content)}. Retrying...")
+            continue
+        else:
+            # Not a truncation issue, some other parsing problem - don't retry
+            logger.error(f"Care prompt validation failed for non-truncation reason for {group_key} '{plant_name}'. Stopping retries.")
+            break
+    
+    # All attempts failed
+    logger.error(f"Failed to generate valid care response for {group_key} '{plant_name}' after 3 attempts")
+    return None
 
 # --- New 3-Step Plant Care Functions ---
 
