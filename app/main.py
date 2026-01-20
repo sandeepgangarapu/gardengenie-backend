@@ -8,11 +8,11 @@ from starlette.responses import JSONResponse
 
 from .config import APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS, MAX_UPLOAD_MB
 from .models import (
-    PlantCareInput, PlantIdentificationResponse, PlantCareFullResponse,
+    PlantIdentificationResponse,
     AddPlantInput, PlantBasicInfoResponse, PlantPlantingResponse, PlantCareResponse
 )
 from .services.plant_care.plant_care import (
-    generate_plant_care_instructions, fetch_and_store_image_for_plant,
+    fetch_and_store_image_for_plant,
     generate_plant_basic_info, generate_plant_planting_info, generate_plant_care_info
 )
 from .services.plant_identification.plant_identification import identify_plant_from_uploaded_image, validate_image_data
@@ -65,45 +65,6 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestSizeLimitMiddleware, max_upload_mb=MAX_UPLOAD_MB)
 
 # --- API Endpoints ---
-
-@app.post("/plant-care-instructions", response_model=PlantCareFullResponse)
-async def get_plant_care_instructions(payload: PlantCareInput, request: Request, background_tasks: BackgroundTasks):
-    """
-    Receives a plant name and USDA zone, classifies the plant care category,
-    generates appropriate care instructions using an LLM, stores the result
-    in Supabase, and returns the care instructions as a JSON object.
-    """
-    supabase_client = get_supabase_client()
-    if supabase_client is None:
-        raise HTTPException(status_code=503, detail="Database client is not initialized. Cannot process request.")
-
-    plant_name = payload.plant_name
-    user_zone = payload.user_zone
-    logger.info(f"Received request for plant care: '{plant_name}' in zone '{user_zone}'")
-
-    # Generate plant care instructions using the service (offload to threadpool)
-    care_info = await run_in_threadpool(
-        generate_plant_care_instructions,
-        plant_name,
-        user_zone,
-        False,               # skip image handling in-request
-        payload.persist,     # control DB upsert per request; default True
-    )
-    
-    # If the input was determined not to be a plant, return a clear 400
-    if isinstance(care_info, dict) and care_info.get("__non_plant"):
-        raise HTTPException(status_code=400, detail=care_info.get("message", "Input does not appear to be a plant."))
-
-    if care_info is None:
-        raise HTTPException(status_code=503, detail="Error generating plant care instructions.")
-
-    logger.info(f"Successfully generated care instructions for '{plant_name}'")
-
-    # Kick off background image fetch/store using possibly corrected name
-    corrected_plant_name = care_info.get('plantName', plant_name)
-    background_tasks.add_task(fetch_and_store_image_for_plant, corrected_plant_name)
-
-    return care_info
 
 @app.post("/identify-plant", response_model=PlantIdentificationResponse)
 async def identify_plant(file: UploadFile = File(...)):

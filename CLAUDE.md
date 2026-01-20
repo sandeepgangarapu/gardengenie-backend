@@ -45,9 +45,11 @@ This is a FastAPI-based Plant Care API that provides AI-powered plant identifica
 
 ### API Endpoints
 
-1. `POST /plant-care-instructions` - Generate care instructions for a plant name and USDA zone
-2. `POST /identify-plant` - Upload image for AI plant identification
-3. `GET /health` - Health check with database connectivity status
+1. `POST /add-plant` - Step 1: Add a plant and get basic information
+2. `POST /plant-planting/{plant_id}` - Step 2: Get planting instructions for an existing plant
+3. `POST /plant-care/{plant_id}` - Step 3: Get care instructions for an existing plant
+4. `POST /identify-plant` - Upload image for AI plant identification
+5. `GET /health` - Health check with database connectivity status
 
 ### Data Flow
 
@@ -69,7 +71,10 @@ UNSPLASH_ACCESS_KEY=your_unsplash_key  # Optional for image fetching
 
 ### Key Models
 
-- `PlantCareInput` - Input validation for plant name and USDA zone
+- `AddPlantInput` - Input validation for plant name and USDA zone (Step 1)
+- `PlantBasicInfoResponse` - Basic plant information response
+- `PlantPlantingResponse` - Planting instructions response
+- `PlantCareResponse` - Care instructions response
 - `PlantIdentificationResponse` - Structured response for plant identification
 
 ### Database Schema Context
